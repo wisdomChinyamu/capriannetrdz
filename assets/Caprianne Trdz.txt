@@ -1,0 +1,430 @@
+Caprianne Trdz
+CAPRIANNE TRDZ – Multi-Platform Trading Performance System (Final Requirements Document)
+
+A cinematic, disciplined, SMC-driven trading operating system built as a cross-platform application that runs on:
+
+Mobile (Android APK + iOS IPA)
+
+Desktop (.EXE / .DMG via Tauri)
+
+Web Browser (React Native Web)
+
+All from ONE React-based codebase (Expo + RN Web + Tauri).
+
+This document defines everything the app must do, how it should behave, the data that must be captured, the psychology integrations, the SMC protocol integrations, and the user-controlled checklist system.
+
+🎯 1. Core Purpose of the App
+
+Caprianne Trdz exists to:
+
+Track trades with precision
+
+Make traders follow their SMC rules
+
+Improve discipline, psychology, and execution
+
+Help traders validate + refine their edge
+
+Maintain a cinematic, aesthetic, calm interface
+
+Remove noise and force actual trading mastery
+
+This is a trading performance operating system, not a charting tool and not a signal app.
+
+🔥 2. What Was Removed & Why
+
+From your original doc:
+
+❌ MT5 automatic integration
+❌ API bridges
+❌ Supabase backend
+❌ External sync systems
+❌ Flutter/Next.js stack notes
+
+Everything replaced with what YOU requested:
+
+✔️ Firebase backend
+✔️ Manual trade input only
+✔️ User-editable SMC checklist module
+
+This is now a clean blueprint for your actual build.
+
+📌 3. What You WILL Build (Updated Feature List)
+A. Manual Trade Entry System (Full Control)
+
+The user manually enters:
+
+Pair (e.g., GBPUSD)
+
+Direction (Buy/Sell)
+
+Session (London/NY/Asia)
+
+Entry price
+
+Stop loss
+
+Take profit
+
+Actual exit price (optional)
+
+R:R (auto-calculated)
+
+Result: Win / Loss / Break-even
+
+Setup type (from your SMC notes)
+
+Screenshots (upload)
+
+Notes / reflections
+
+Emotional state rating (1–10)
+
+Rule deviation flag
+
+➕ Auto-calculated values
+
+Risk to Reward using formula:
+(TP – Entry) / (Entry – SL) for buys
+(Entry – TP) / (SL – Entry) for sells
+
+Confluence score (from customizable checklist)
+
+Grade (A+, A, B, C, D)
+
+B. Editable SMC-Based Confluence Checklist
+
+Checklist is based on your SMC Notes scoring system (Directional Bias, Order Block Validity, Liquidity Sweep, 1M Confirmation, R:R Quality, etc).
+
+BUT now:
+
+User can:
+
+✔ Add new checklist items
+✔ Remove checklist items
+✔ Edit description
+✔ Assign weight (max points)
+✔ Assign category (Critical / Important / Optional)
+
+Every trade’s confluence score = dynamic calculation
+
+The app uses the user’s current checklist template.
+
+C. SMC Execution Protocol Tools
+
+The app uses your SMC Notes to build the core protocol screens:
+
+Pre-Market Routine
+
+Directional bias check
+
+Liquidity marking
+
+Review yesterday’s lessons
+
+Emotional state readiness
+
+News check
+
+SMC rule review
+
+Execution Protocol
+
+Did bias break?
+
+Did price sweep liquidity?
+
+Is there a valid OB?
+
+Did internal structure align?
+
+Is there a clean FVG?
+
+1M ChoCh confirmation?
+
+Entry checklist
+
+Post-Trade Reflection
+
+Screenshot upload
+
+Emotional log
+
+Rule deviation
+
+Lessons learned
+
+Execution quality rating
+
+Weekly Review
+
+Patterns in wins
+
+Patterns in losses
+
+Deviations count
+
+Emotional trends
+
+Setup performance
+
+All using Firebase storage + Firestore.
+
+D. Analytics Suite
+
+Analytics must visualize:
+
+✔ Win rate
+✔ Average R:R
+✔ Profit factor
+✔ Equity curve
+✔ Performance by:
+
+Pair
+
+Session
+
+Setup type
+
+Checklist score
+
+Emotional rating
+
+✔ Deviation rate
+✔ Psychology trends
+✔ Confluence score correlation
+✔ Weekly/Monthly summaries
+
+Charts generated locally (no backend computation needed).
+
+E. Psychology System
+
+The user logs daily:
+
+Emotional state (1–10)
+
+Notes describing their mindset
+
+Deviations (if any)
+
+Confidence rating for the day
+
+Intentions for the session
+
+App correlates:
+
+mood vs results
+
+mood vs R:R
+
+mood vs deviations
+
+mood vs session performance
+
+This gives the trader a mirror for their emotional patterns.
+
+F. Routine & Checklist Module
+
+Users can:
+
+Customize routines
+
+Save templates
+
+Load templates
+
+Track completion %
+
+Mark items done
+
+Reset daily
+
+The UI must feel ritualistic and clean — a daily “trading warm-up.”
+
+G. Screens & Navigation Structure
+Dashboard
+
+Summary stats
+
+Equity curve
+
+Today’s emotional rating
+
+Deviation count
+
+Quick links to journal, routines, analytics
+
+Journal
+
+Trade cards
+
+Filters by:
+pair, result, date, setup, confluence, emotion
+
+Trade detail modal with screenshots, notes, and scoring breakdown
+
+Analytics
+
+All the performance graphs
+
+A+ / A / B / C trade distribution
+
+Emotional vs performance
+
+Setup performance
+
+Routine
+
+Pre-market checklist
+
+Execution checklist
+
+Post-trade reflection
+
+Weekly review workflow
+
+Settings
+
+Edit checklist items
+
+Choose scoring weights
+
+Edit themes
+
+Manage Firebase account
+
+Export data to CSV/PDF
+
+🗄 4. Firebase Data Requirements
+Collections
+users
+
+username
+
+email
+
+timezone
+
+trades
+
+pair
+
+entry
+
+sl
+
+tp
+
+rr
+
+result
+
+etc
+
+journal_entries
+
+trade_id
+
+notes
+
+emotional data
+
+checklist_template
+
+user_id
+
+items[] with {label, weight, category}
+
+checklist_records
+
+trade_id
+
+selected items
+
+computed score
+
+psychology_logs
+
+day score
+
+notes
+
+Everything connected to the authenticated user via Firebase Auth.
+
+🎨 5. UI / UX Requirements
+
+Cinematic + dark + minimal:
+
+Graphite background
+
+Whitesmoke text
+
+Cyan/teal glow
+
+Smooth panels
+
+Animated cards
+
+Framer Motion transitions
+
+Clean, calming, futuristic
+
+No clutter, no noise — serious trading vibe only.
+
+💻 6. Technology Stack (Finalized)
+
+You told me earlier you want:
+
+✔ ONE React codebase
+✔ Mobile + Desktop + Web
+✔ Using the stack we discussed
+
+So the final stack is:
+
+Frontend
+
+Expo (React Native)
+
+React Native Web
+
+Tauri (desktop)
+
+Backend
+
+Firebase Authentication
+
+Firebase Firestore
+
+Firebase Storage
+
+Local Calculations
+
+R:R
+
+Confluence score
+
+Equity curve
+
+Analytics
+
+No server needed.
+
+🧠 7. Final AI Prompt YOU Requested
+
+Use this anytime you want an AI to write components, architecture, or code.
+
+THE FINAL AI PROMPT
+
+You are building a cross-platform trading performance system named Caprianne Trdz. The app must run as a mobile app (Expo/React Native), a web app (React Native Web), and a desktop app (.exe via Tauri), all from ONE React/Expo codebase. The backend is Firebase (Authentication, Firestore, Storage).
+
+The app allows manual trade entry (entry, stop loss, take profit, direction, pair, actual exit, result, session, psychological score, screenshots, notes). R:R must be auto-calculated.
+
+The user has a customizable SMC-based confluence checklist where they can add/remove/edit items and assign weight/points. The system must calculate confluence score dynamically for every trade.
+
+The app includes Pre-Market routine, Execution checklist, Post-Trade reflection, and Weekly Review modules based on SMC principles.
+
+Analytics must include win rate, average R:R, profit factor, deviation rate, emotional correlation, setup performance, confluence correlation, equity curve, and weekly/monthly stats. All analytics are calculated client-side from Firebase data.
+
+The UI must be cinematic, dark-themed, minimal, with soft glow effects, smooth transitions, and professional trader aesthetics. Use Framer Motion where possible.
+
+When generating code, architecture, components, or instructions, always ensure they match this system exactly.
