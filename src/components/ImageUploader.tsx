@@ -1,6 +1,14 @@
-import React, { useCallback } from 'react';
-import { Platform, View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { useTheme } from './ThemeProvider';
+import React, { useCallback } from "react";
+import {
+  Platform,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+} from "react-native";
+import { useTheme } from "./ThemeProvider";
+import { uploadTradeImage } from "../services/supabaseImageService";
 
 type ImageUploaderProps = {
   screenshots: string[];
@@ -8,30 +16,44 @@ type ImageUploaderProps = {
   onRemove: (uri: string) => void;
 };
 
-export default function ImageUploader({ screenshots, onAdd, onRemove }: ImageUploaderProps) {
+export default function ImageUploader({
+  screenshots,
+  onAdd,
+  onRemove,
+}: ImageUploaderProps) {
   const { colors } = useTheme();
 
   const handleWebPicker = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
     input.onchange = async (e: any) => {
       const file: File = e.target.files?.[0];
       if (!file) return;
-      const url = URL.createObjectURL(file);
-      onAdd(url, file);
+      // Assume tradeId is available via prop or context, for demo use 'web-upload'
+      const tradeId = "web-upload";
+      const supabaseUrl = await uploadTradeImage(tradeId, file);
+      if (supabaseUrl) {
+        onAdd(supabaseUrl, file);
+      } else {
+        // fallback to local preview if upload fails
+        const url = URL.createObjectURL(file);
+        onAdd(url, file);
+      }
     };
     input.click();
   }, [onAdd]);
 
   const handleNative = useCallback(async () => {
     try {
-      if (Platform.OS === 'web') {
-        console.warn('Image picker not available on web, use handleWebPicker instead');
+      if (Platform.OS === "web") {
+        console.warn(
+          "Image picker not available on web, use handleWebPicker instead"
+        );
         return;
       }
 
-      const ImagePicker = await import('expo-image-picker');
+      const ImagePicker = await import("expo-image-picker");
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
@@ -40,16 +62,16 @@ export default function ImageUploader({ screenshots, onAdd, onRemove }: ImageUpl
         onAdd(res.uri);
       }
     } catch (err) {
-      console.error('Image picker error (this is normal on web):', err);
-      if (Platform.OS === 'web') {
-        console.info('Falling back to web file picker...');
+      console.error("Image picker error (this is normal on web):", err);
+      if (Platform.OS === "web") {
+        console.info("Falling back to web file picker...");
         handleWebPicker();
       }
     }
   }, [onAdd, handleWebPicker]);
 
   const handlePress = useCallback(() => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       handleWebPicker();
     } else {
       handleNative();
@@ -61,16 +83,18 @@ export default function ImageUploader({ screenshots, onAdd, onRemove }: ImageUpl
       <View style={styles.row}>
         {screenshots.map((s) => (
           <View key={s} style={styles.thumbWrap}>
-            <Image 
-              source={{ uri: s }} 
-              style={[styles.thumb, { backgroundColor: colors.surface }]} 
+            <Image
+              source={{ uri: s }}
+              style={[styles.thumb, { backgroundColor: colors.surface }]}
             />
-            <TouchableOpacity 
-              style={[styles.remove, { backgroundColor: colors.lossEnd }]} 
+            <TouchableOpacity
+              style={[styles.remove, { backgroundColor: colors.lossEnd }]}
               onPress={() => onRemove(s)}
               accessibilityLabel="Remove image"
             >
-              <Text style={[styles.removeText, { color: colors.surface }]}>×</Text>
+              <Text style={[styles.removeText, { color: colors.surface }]}>
+                ×
+              </Text>
             </TouchableOpacity>
           </View>
         ))}
@@ -82,7 +106,7 @@ export default function ImageUploader({ screenshots, onAdd, onRemove }: ImageUpl
         accessibilityLabel="Upload screenshot"
       >
         <Text style={[styles.buttonText, { color: colors.text }]}>
-          {Platform.OS === 'web' ? 'Choose Image' : 'Upload Screenshot'}
+          {Platform.OS === "web" ? "Choose Image" : "Upload Screenshot"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -90,43 +114,43 @@ export default function ImageUploader({ screenshots, onAdd, onRemove }: ImageUpl
 }
 
 const styles = StyleSheet.create({
-  row: { 
-    flexDirection: 'row', 
-    gap: 8, 
+  row: {
+    flexDirection: "row",
+    gap: 8,
     marginBottom: 12,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
-  thumbWrap: { 
-    position: 'relative' 
+  thumbWrap: {
+    position: "relative",
   },
-  thumb: { 
-    width: 80, 
-    height: 80, 
+  thumb: {
+    width: 80,
+    height: 80,
     borderRadius: 8,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   remove: {
-    position: 'absolute',
+    position: "absolute",
     top: -8,
     right: -8,
     width: 22,
     height: 22,
     borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  removeText: { 
-    fontWeight: '700',
+  removeText: {
+    fontWeight: "700",
     fontSize: 16,
   },
   button: {
     paddingVertical: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
-  buttonText: { 
-    fontWeight: '700',
+  buttonText: {
+    fontWeight: "700",
     fontSize: 14,
   },
 });

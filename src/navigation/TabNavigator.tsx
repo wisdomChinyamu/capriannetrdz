@@ -2,10 +2,13 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-// On web, use stack instead of native-stack to avoid safe-area-context dependency
-const Stack = Platform.OS === 'web'
-  ? require('@react-navigation/stack').createStackNavigator()
-  : require('@react-navigation/native-stack').createNativeStackNavigator();
+// Conditional import based on platform to avoid bundling native-stack on web
+const createStackNavigator = Platform.OS === 'web' 
+  ? () => require('@react-navigation/stack').createStackNavigator()
+  : () => require('@react-navigation/native-stack').createNativeStackNavigator();
+
+const Stack = createStackNavigator();
+
 import DashboardScreen from '../screens/DashboardScreen';
 import JournalScreen from '../screens/JournalScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
@@ -14,24 +17,24 @@ import SettingsScreen from '../screens/SettingsScreen';
 import TradeDetailScreen from '../screens/TradeDetailScreen';
 import AddTradeScreen from '../screens/AddTradeScreen';
 
-const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+// Define common header options
+const headerOptions = {
+  headerStyle: {
+    backgroundColor: '#1a1a1a',
+  },
+  headerTintColor: '#f5f5f5',
+  headerTitleStyle: {
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  headerShadowVisible: false,
+};
 
 function DashboardStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1a1a1a',
-        },
-        headerTintColor: '#f5f5f5',
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={headerOptions}>
       <Stack.Screen
         name="DashboardMain"
         component={DashboardScreen}
@@ -40,7 +43,10 @@ function DashboardStack() {
       <Stack.Screen
         name="AddTrade"
         component={AddTradeScreen}
-        options={{ title: 'New Trade', presentation: 'modal' }}
+        options={{ 
+          title: 'New Trade', 
+          presentation: Platform.OS === 'web' ? 'card' : 'modal' 
+        }}
       />
     </Stack.Navigator>
   );
@@ -48,19 +54,7 @@ function DashboardStack() {
 
 function JournalStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1a1a1a',
-        },
-        headerTintColor: '#f5f5f5',
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={headerOptions}>
       <Stack.Screen
         name="JournalMain"
         component={JournalScreen}
@@ -79,19 +73,7 @@ function JournalStack() {
 
 function AnalyticsStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1a1a1a',
-        },
-        headerTintColor: '#f5f5f5',
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={headerOptions}>
       <Stack.Screen
         name="AnalyticsMain"
         component={AnalyticsScreen}
@@ -103,19 +85,7 @@ function AnalyticsStack() {
 
 function RoutineStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1a1a1a',
-        },
-        headerTintColor: '#f5f5f5',
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={headerOptions}>
       <Stack.Screen
         name="RoutineMain"
         component={RoutineScreen}
@@ -127,19 +97,7 @@ function RoutineStack() {
 
 function SettingsStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1a1a1a',
-        },
-        headerTintColor: '#f5f5f5',
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={headerOptions}>
       <Stack.Screen
         name="SettingsMain"
         component={SettingsScreen}

@@ -1,5 +1,5 @@
 import './src/polyfills/crypto';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppProvider } from './src/context/AppContext';
@@ -18,6 +18,24 @@ if (Platform.OS !== 'web') {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Initialize Tauri APIs only in desktop environment
+    const initializeTauri = async () => {
+      // Only try to initialize Tauri in desktop environments
+      if (Platform.OS === 'windows' || Platform.OS === 'macos' || Platform.OS === 'linux') {
+        try {
+          // Dynamic import to avoid bundling in web builds
+          const { initializeTauri } = await import('./src/utils/tauriUtils');
+          await initializeTauri();
+        } catch (error) {
+          console.warn('Failed to initialize Tauri:', error);
+        }
+      }
+    };
+    
+    initializeTauri();
+  }, []);
+
   const RootView = GestureHandlerRootView;
   const rootProps = Platform.OS === 'web' ? {} : { style: { flex: 1 } };
 

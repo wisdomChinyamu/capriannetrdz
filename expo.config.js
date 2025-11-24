@@ -1,5 +1,6 @@
-const appJson = require('./app.json');
 
-module.exports = {
+import appJson from './app.json' assert { type: 'json' };
+
+export default {
   ...appJson.expo,
 };

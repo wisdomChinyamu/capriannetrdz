@@ -48,6 +48,8 @@ export default function DashboardScreen() {
       ? (trades.reduce((sum, t) => sum + t.confluenceScore, 0) / trades.length).toFixed(1)
       : '0';
 
+  // Responsive layout: web/desktop side-by-side, mobile stacked
+  const isWeb = Platform.OS === 'web';
   return (
     <ScreenLayout style={{ backgroundColor: colors.background }}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -74,18 +76,34 @@ export default function DashboardScreen() {
           <StatBox label="Emotion" value={todayEmotionalRating} unit="/10" />
         </ScrollView>
 
-        {/* Equity + Calendar */}
-        <Card>
-          <EquityChart series={equitySeries} />
-        </Card>
-
-        <Card>
-          <CalendarHeatmap
-            trades={trades}
-            onDayPress={(date) => setSelectedDate(date)}
-            theme={mode}
-          />
-        </Card>
+        {/* Equity + Calendar + Weekly Summary */}
+        <View style={isWeb ? styles.row : undefined}>
+          <View style={isWeb ? styles.leftCol : undefined}>
+            <Card>
+              <EquityChart series={equitySeries} />
+            </Card>
+            <Card>
+              <CalendarHeatmap
+                trades={trades}
+                onDayPress={(date) => setSelectedDate(date)}
+                theme={mode}
+              />
+            </Card>
+          </View>
+          <View style={isWeb ? styles.rightCol : undefined}>
+              <Card>
+                {/* Weekly Summary Panel */}
+                <WeeklySummaryPanel trades={trades} />
+              </Card>
+          </View>
+        </View>
+        {/* On mobile, show WeeklySummaryPanel below calendar */}
+        {!isWeb && (
+          <Card>
+              <WeeklySummaryPanel trades={trades} />
+          </Card>
+        )}
+import WeeklySummaryPanel from '../components/WeeklySummaryPanel';
 
         {/* Trade Distribution */}
         <Card>
@@ -226,6 +244,20 @@ function DayTradesModalAnimated({ visible, date, trades, onClose }: any) {
 }
 
 const styles = StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 24,
+    },
+    leftCol: {
+      flex: 2,
+      minWidth: 0,
+    },
+    rightCol: {
+      flex: 1,
+      minWidth: 180,
+      maxWidth: 260,
+    },
   container: {
     flex: 1,
     backgroundColor: '#0d0d0d',
