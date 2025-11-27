@@ -16,20 +16,17 @@ Caprianne Trdz is a cross-platform trading performance operating system built wi
 ### Tech Stack
 
 **Frontend:**
-
 - React 19 + React Native 0.81
 - Expo (mobile) + React Native Web (web) + Tauri (desktop)
 - React Navigation (tab + stack navigation)
 - TypeScript for type safety
 
 **Backend:**
-
 - Firebase Authentication (user login)
 - Firebase Firestore (trades, checklists, psychology logs)
-- Supabase Storage (trade screenshots)
+- Firebase Storage (trade screenshots)
 
 **Utilities:**
-
 - Client-side calculations: R:R, confluence scores, analytics
 - No backend computation needed
 
@@ -77,12 +74,11 @@ yarn install
 
 1. Create a Firebase project at [firebase.google.com](https://firebase.google.com)
 2. Enable:
-
    - Authentication (Email/Password)
    - Firestore Database (in native mode)
    - Storage
 
-3. Create `.env.local` file in the project root:
+3. Create `.env.local` file in the project root (copy from `.env.local` template):
 
 ```env
 EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
@@ -93,14 +89,17 @@ EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
 ```
 
-4. Update `src/config/firebase.ts` with your config values.
+4. Update the values with your actual Firebase configuration:
+   - Navigate to Firebase Console -> Project Settings -> General -> Your apps
+   - Copy the config values from the "Firebase SDK snippet" section
+
+> Note: If you skip this step, the app will run in offline mode with limited functionality.
 
 ### 3. Firestore Collections Schema
 
 Create these collections in Firebase:
 
 **Collection: `trades`**
-
 ```
 {
   userId: string
@@ -118,7 +117,7 @@ Create these collections in Firebase:
   setupType: string
   emotionalRating: 1-10
   ruleDeviation: boolean
-  screenshots: string[] (Supabase Storage URLs)
+  screenshots: string[] (Firebase Storage URLs)
   notes: string
   createdAt: timestamp
   updatedAt: timestamp
@@ -126,7 +125,6 @@ Create these collections in Firebase:
 ```
 
 **Collection: `checklist_template`**
-
 ```
 {
   userId: string
@@ -146,7 +144,6 @@ Create these collections in Firebase:
 ```
 
 **Collection: `psychology_logs`**
-
 ```
 {
   userId: string
@@ -162,7 +159,6 @@ Create these collections in Firebase:
 ### 4. Run the App
 
 **Development (Expo):**
-
 ```bash
 npm start              # Start Expo server
 npm run android        # Run on Android
@@ -171,7 +167,6 @@ npm run web            # Run on web browser
 ```
 
 **Desktop (Tauri):**
-
 ```bash
 npm run tauri dev      # Development mode
 npm run tauri build    # Production build
