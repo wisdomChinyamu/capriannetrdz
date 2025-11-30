@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Platform,
   View,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { useTheme } from "./ThemeProvider";
 import { uploadTradeImage } from "../services/supabaseImageService";
@@ -14,33 +15,49 @@ type ImageUploaderProps = {
   screenshots: string[];
   onAdd: (localUri: string, file?: File) => void;
   onRemove: (uri: string) => void;
+  maxImages?: number;
 };
 
 export default function ImageUploader({
   screenshots,
   onAdd,
   onRemove,
+  maxImages = 5,
 }: ImageUploaderProps) {
   const { colors } = useTheme();
+  const [uploading, setUploading] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const handleWebPicker = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
+    input.multiple = false;
+    
     input.onchange = async (e: any) => {
       const file: File = e.target.files?.[0];
       if (!file) return;
-      // Assume tradeId is available via prop or context, for demo use 'web-upload'
-      const tradeId = "web-upload";
-      const supabaseUrl = await uploadTradeImage(tradeId, file);
-      if (supabaseUrl) {
-        onAdd(supabaseUrl, file);
-      } else {
-        // fallback to local preview if upload fails
-        const url = URL.createObjectURL(file);
-        onAdd(url, file);
+      
+      setUploading(true);
+      try {
+        // Assume tradeId is available via prop or context, for demo use 'web-upload'
+        const tradeId = "web-upload";
+        const supabaseUrl = await uploadTradeImage(tradeId, file);
+        
+        if (supabaseUrl) {
+          onAdd(supabaseUrl, file);
+        } else {
+          // fallback to local preview if upload fails
+          const url = URL.createObjectURL(file);
+          onAdd(url, file);
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+      } finally {
+        setUploading(false);
       }
     };
+    
     input.click();
   }, [onAdd]);
 
@@ -53,11 +70,15 @@ export default function ImageUploader({
         return;
       }
 
+      setUploading(true);
       const ImagePicker = await import("expo-image-picker");
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
+        allowsEditing: true,
+        aspect: [16, 9],
       });
+      
       if (!res.canceled && "uri" in res && typeof res.uri === "string") {
         onAdd(res.uri);
       }
@@ -67,90 +88,272 @@ export default function ImageUploader({
         console.info("Falling back to web file picker...");
         handleWebPicker();
       }
+    } finally {
+      setUploading(false);
     }
   }, [onAdd, handleWebPicker]);
 
   const handlePress = useCallback(() => {
+    if (screenshots.length >= maxImages) {
+      return; // Max images reached
+    }
+    
     if (Platform.OS === "web") {
       handleWebPicker();
     } else {
       handleNative();
     }
-  }, [handleWebPicker, handleNative]);
+  }, [handleWebPicker, handleNative, screenshots.length, maxImages]);
+
+  const canAddMore = screenshots.length < maxImages;
 
   return (
-    <View>
-      <View style={styles.row}>
-        {screenshots.map((s) => (
-          <View key={s} style={styles.thumbWrap}>
-            <Image
-              source={{ uri: s }}
-              style={[styles.thumb, { backgroundColor: colors.surface }]}
-            />
-            <TouchableOpacity
-              style={[styles.remove, { backgroundColor: colors.lossEnd }]}
-              onPress={() => onRemove(s)}
-              accessibilityLabel="Remove image"
-            >
-              <Text style={[styles.removeText, { color: colors.surface }]}>
-                ×
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
+    <View style={styles.container}>
+      {/* Header */}
+      {screenshots.length > 0 && (
+        <View style={styles.header}>
+          <Text style={[styles.headerText, { color: colors.text }]}>
+            Screenshots
+          </Text>
+          <Text style={[styles.countText, { color: colors.subtext }]}>
+            {screenshots.length} / {maxImages}
+          </Text>
+        </View>
+      )}
 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.highlight }]}
-        onPress={handlePress}
-        accessibilityLabel="Upload screenshot"
-      >
-        <Text style={[styles.buttonText, { color: colors.text }]}>
-          {Platform.OS === "web" ? "Choose Image" : "Upload Screenshot"}
-        </Text>
-      </TouchableOpacity>
+      {/* Image Grid */}
+      {screenshots.length > 0 && (
+        <View style={styles.grid}>
+          {screenshots.map((s, index) => (
+            <View
+              key={s}
+              style={[
+                styles.imageWrapper,
+                {
+                  borderColor: hoveredIndex === index ? colors.highlight : 'transparent',
+                  borderWidth: 2,
+                },
+              ]}
+              {...Platform.select({
+                web: {
+                  onMouseEnter: () => setHoveredIndex(index),
+                  onMouseLeave: () => setHoveredIndex(null)
+                },
+                default: {}
+              })}
+            >
+              <Image
+                source={{ uri: s }}
+                style={[styles.thumbnail, { backgroundColor: colors.surface }]}
+                resizeMode="cover"
+              />
+              
+              {/* Overlay on hover/press */}
+              {hoveredIndex === index && (
+                <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                  <Text style={[styles.overlayText, { color: colors.text }]}>
+                    #{index + 1}
+                  </Text>
+                </View>
+              )}
+              
+              {/* Remove button */}
+              <TouchableOpacity
+                style={[
+                  styles.removeButton,
+                  {
+                    backgroundColor: colors.lossEnd,
+                    shadowColor: colors.lossEnd,
+                  },
+                ]}
+                onPress={() => onRemove(s)}
+                accessibilityLabel="Remove image"
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.removeIcon, { color: '#fff' }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Upload Button */}
+      {canAddMore && (
+        <TouchableOpacity
+          style={[
+            styles.uploadButton,
+            {
+              backgroundColor: uploading ? colors.neutral : `${colors.highlight}20`,
+              borderColor: colors.highlight,
+              borderWidth: 2,
+              borderStyle: 'dashed',
+            },
+          ]}
+          onPress={handlePress}
+          accessibilityLabel="Upload screenshot"
+          disabled={uploading}
+          activeOpacity={0.7}
+        >
+          {uploading ? (
+            <View style={styles.uploadingContainer}>
+              <ActivityIndicator size="small" color={colors.highlight} />
+              <Text style={[styles.uploadingText, { color: colors.subtext }]}>
+                Uploading...
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.uploadContent}>
+              <Text style={[styles.uploadIcon, { color: colors.highlight }]}>
+                📸
+              </Text>
+              <Text style={[styles.uploadText, { color: colors.text }]}>
+                {screenshots.length === 0
+                  ? Platform.OS === "web"
+                    ? "Choose Images"
+                    : "Add Screenshots"
+                  : "Add More"}
+              </Text>
+              <Text style={[styles.uploadHint, { color: colors.subtext }]}>
+                {Platform.OS === "web" 
+                  ? "Click to browse"
+                  : "Tap to select from gallery"}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {/* Max reached message */}
+      {!canAddMore && (
+        <View style={[styles.maxReachedContainer, { backgroundColor: `${colors.neutral}80` }]}>
+          <Text style={[styles.maxReachedText, { color: colors.subtext }]}>
+            Maximum {maxImages} images reached
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  container: {
+    gap: 12,
+  },
+  header: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  headerText: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  grid: {
+    flexDirection: "row",
     flexWrap: "wrap",
+    gap: 12,
   },
-  thumbWrap: {
+  imageWrapper: {
     position: "relative",
+    borderRadius: 12,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
-  thumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    resizeMode: "cover",
+  thumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
   },
-  remove: {
+  overlay: {
     position: "absolute",
-    top: -8,
-    right: -8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 10,
   },
-  removeText: {
-    fontWeight: "700",
+  overlayText: {
     fontSize: 16,
+    fontWeight: "700",
   },
-  button: {
+  removeButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  removeIcon: {
+    fontWeight: "700",
+    fontSize: 20,
+    lineHeight: 22,
+  },
+  uploadButton: {
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 120,
+  },
+  uploadingContainer: {
+    alignItems: "center",
+    gap: 12,
+  },
+  uploadingText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  uploadContent: {
+    alignItems: "center",
+    gap: 8,
+  },
+  uploadIcon: {
+    fontSize: 40,
+    marginBottom: 4,
+  },
+  uploadText: {
+    fontWeight: "700",
+    fontSize: 15,
+    letterSpacing: 0.3,
+  },
+  uploadHint: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  maxReachedContainer: {
     paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 8,
   },
-  buttonText: {
-    fontWeight: "700",
-    fontSize: 14,
+  maxReachedText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
