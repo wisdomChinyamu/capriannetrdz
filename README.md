@@ -1,4 +1,4 @@
-# Caprianne Trdz - Trading Performance System
+ # Caprianne Trdz - Trading Performance System
 
 ## 📋 Project Overview
 
@@ -7,6 +7,7 @@ Caprianne Trdz is a cross-platform trading performance operating system built wi
 - **Track trades** with precision (entry, stop loss, take profit, actual exit, result)
 - **Auto-calculate R:R ratios** using SMC price action rules
 - **Manage editable SMC checklists** as customizable tables
+- **Add trading strategies** with customized checklists for evaluating trade quality
 - **Log psychology & emotions** and correlate with trading results
 - **Generate analytics** (win rate, profit factor, performance by pair/session/setup)
 - **Follow trading routines** (Pre-Market, Execution, Post-Trade, Weekly Review)
@@ -199,9 +200,7 @@ npm run tauri build    # Production build
 - **Session**: London/NY/Asia
 - **Prices**: Entry, Stop Loss, Take Profit, Actual Exit
 - **Result**: Win/Loss/Break-even
-- **Auto-Calculate**: R:R ratio, Confluence Score, Grade
-- **Psychology**: Emotional rating (1-10), rule deviation flag
-- **Documentation**: Notes, screenshots
+- **Strategies**: Custom strategy selection for categorizing trades
 
 ### 2. Editable SMC Checklist Table
 
@@ -211,9 +210,19 @@ The **EditableChecklistTable** component features:
 - **Categories**: Critical (red) | Important (gold) | Optional (blue)
 - **Actions**: Edit (✎) | Delete (🗑) | Add new items
 - **Dynamic Scoring**: Confluence score auto-updates based on selected items
+- **Strategy-Based Checklists**: Create custom checklists for different strategies to evaluate trade quality
 - **Inline Editing**: Edit directly in table without modal
 
-### 3. SMC Execution Protocols
+### 3. Strategy Management
+
+Traders can define custom strategies and create specific checklists for each strategy:
+
+- **Add New Strategies**: Create and name custom trading strategies
+- **Custom Evaluation Criteria**: Define unique checklist items for each strategy
+- **Quality Assessment**: Use strategy-specific checklists to determine if a trade setup qualifies as good or bad
+- **Performance Tracking**: Track performance separately for each strategy
+
+### 4. SMC Execution Protocols
 
 The Routine screen organizes checklists by category:
 
@@ -222,7 +231,7 @@ The Routine screen organizes checklists by category:
 - **Post-Trade**: Screenshot upload, emotional log, rule deviation, lessons
 - **Weekly Review**: Pattern analysis, deviation count, emotional trends, performance
 
-### 4. Analytics Dashboard
+### 5. Analytics Dashboard
 
 Visualizes:
 
@@ -235,7 +244,7 @@ Visualizes:
 - Emotional correlation
 - Deviation rate (%)
 
-### 5. Psychology System
+### 6. Psychology System
 
 Daily logging:
 
