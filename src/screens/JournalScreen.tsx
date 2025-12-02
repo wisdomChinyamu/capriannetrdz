@@ -3,7 +3,7 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ScrollView, 
+  ScrollView,
   TextInput, 
   TouchableOpacity, 
   FlatList,
@@ -140,7 +140,7 @@ export default function JournalScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Stats */}
       <View style={styles.header}>
         <Text style={styles.title}>Trade Journal</Text>
@@ -266,9 +266,10 @@ export default function JournalScreen({ navigation }: any) {
           renderItem={renderTradeCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
         />
       )}
-    </View>
+    </ScrollView>
   );
 }
 
