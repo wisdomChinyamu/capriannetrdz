@@ -49,7 +49,7 @@ export async function uploadTradeImage(
     // Get public URL of uploaded image
     const { data: publicUrlData } = supabase.storage
       .from(BUCKET_NAME)
-      .getPublicUrl(fileName);
+      .getPublicUrl(data.path);
 
     return publicUrlData.publicUrl;
   } catch (error) {
