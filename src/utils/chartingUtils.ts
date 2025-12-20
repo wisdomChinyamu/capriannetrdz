@@ -54,8 +54,22 @@ export function calculateWinLossRatio(trades: any[]): {
     return { wins: 0, losses: 0, ratio: '0:0' };
   }
 
-  const wins = trades.filter(t => t.status === 'win').length;
-  const losses = trades.filter(t => t.status === 'loss').length;
+  let wins = 0;
+  let losses = 0;
+
+  trades.forEach((t: any) => {
+    const statusRaw = t.status ?? t.result ?? null;
+    const pnl = typeof t.pnl === 'number' ? t.pnl : null;
+
+    if (statusRaw) {
+      const s = String(statusRaw).toLowerCase();
+      if (s === 'win' || s === 'won') wins++;
+      else if (s === 'loss' || s === 'lost' || s === 'losses') losses++;
+    } else if (pnl !== null) {
+      if (pnl > 0) wins++;
+      else if (pnl < 0) losses++;
+    }
+  });
 
   return {
     wins,
@@ -77,10 +91,36 @@ export function calculatePnL(trades: any[]): {
     return { totalPnL: 0, avgPnL: 0, winningTrades: 0, losingTrades: 0 };
   }
 
-  const totalPnL = trades.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
+  let totalPnL = 0;
+  let winningTrades = 0;
+  let losingTrades = 0;
+
+  trades.forEach((trade: any) => {
+    if (typeof trade.pnl === 'number') {
+      totalPnL += trade.pnl;
+      if (trade.pnl > 0) winningTrades++;
+      else if (trade.pnl < 0) losingTrades++;
+      return;
+    }
+
+    // Fallback: derive PnL from riskAmount + riskToReward + result/status
+    const risk = typeof trade.riskAmount === 'number' ? trade.riskAmount : (typeof trade.risk === 'number' ? trade.risk : 0);
+    const rr = typeof trade.riskToReward === 'number' ? trade.riskToReward : (typeof trade.riskRatio === 'number' ? trade.riskRatio : 0);
+    const statusRaw = trade.status ?? trade.result ?? null;
+    const res = statusRaw ? String(statusRaw).toLowerCase() : '';
+
+    if (res === 'win' || res === 'won') {
+      // profit = risk * rr (if rr available) otherwise assume 1:1
+      const profit = risk * (rr || 1);
+      totalPnL += profit;
+      winningTrades++;
+    } else if (res === 'loss' || res === 'lost') {
+      totalPnL -= risk;
+      losingTrades++;
+    }
+  });
+
   const avgPnL = trades.length > 0 ? totalPnL / trades.length : 0;
-  const winningTrades = trades.filter(t => (t.pnl || 0) > 0).length;
-  const losingTrades = trades.filter(t => (t.pnl || 0) < 0).length;
 
   return {
     totalPnL: Math.round(totalPnL * 100) / 100,

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
 import { useAppContext } from "../hooks/useAppContext";
 import EquityCurveChart from "../components/EquityCurveChart";
 import WinRatePieChart from "../components/WinRatePieChart";
@@ -14,18 +14,26 @@ import {
 export default function AnalyticsScreen() {
   const { state } = useAppContext();
   const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month'>('all');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [accountModalVisible, setAccountModalVisible] = useState<boolean>(false);
+
+  const filteredTrades = React.useMemo(() => {
+    const base = state.trades || [];
+    if (!selectedAccountId || selectedAccountId === 'all') return base;
+    return base.filter((t: any) => String(t.accountId || '') === String(selectedAccountId));
+  }, [state.trades, selectedAccountId]);
 
   const metrics = {
-    winRate: calculateWinRate(state.trades),
-    avgRR: calculateAverageRR(state.trades),
-    profitFactor: calculateProfitFactor(state.trades as any),
-    performanceByPair: getPerformanceBy(state.trades, "pair"),
-    performanceBySession: getPerformanceBy(state.trades, "session"),
+    winRate: calculateWinRate(filteredTrades),
+    avgRR: calculateAverageRR(filteredTrades),
+    profitFactor: calculateProfitFactor(filteredTrades as any),
+    performanceByPair: getPerformanceBy(filteredTrades, "pair"),
+    performanceBySession: getPerformanceBy(filteredTrades, "session"),
   };
 
-  const totalTrades = state.trades.length;
-  const winningTrades = state.trades.filter(t => t.result === 'Win').length;
-  const losingTrades = state.trades.filter(t => t.result === 'Loss').length;
+  const totalTrades = filteredTrades.length;
+  const winningTrades = filteredTrades.filter(t => t.result === 'Win').length;
+  const losingTrades = filteredTrades.filter(t => t.result === 'Loss').length;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -35,6 +43,9 @@ export default function AnalyticsScreen() {
           <Text style={styles.title}>Analytics</Text>
           <Text style={styles.subtitle}>Performance insights & statistics</Text>
         </View>
+        <TouchableOpacity onPress={() => setAccountModalVisible(true)} style={{ padding: 8 }}>
+          <Text style={{ color: '#00d4d4', fontWeight: '700' }}>{selectedAccountId === 'all' ? 'All Accounts' : (state.accounts.find(a => a.id === selectedAccountId)?.name || 'Select Account')}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Time Filter */}
@@ -135,7 +146,7 @@ export default function AnalyticsScreen() {
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryValue, { color: '#00d4d4' }]}>
-            {state.trades.filter(t => t.grade.startsWith('A')).length}
+            {filteredTrades.filter(t => (t.grade || '').startsWith('A')).length}
           </Text>
           <Text style={styles.summaryLabel}>A+ Setups</Text>
         </View>
@@ -150,7 +161,7 @@ export default function AnalyticsScreen() {
               <Text style={styles.chartBadgeText}>Cumulative P&L</Text>
             </View>
           </View>
-          <EquityCurveChart trades={state.trades} />
+          <EquityCurveChart trades={filteredTrades} />
         </View>
 
         <View style={styles.chartCard}>
@@ -167,7 +178,7 @@ export default function AnalyticsScreen() {
               </View>
             </View>
           </View>
-          <WinRatePieChart trades={state.trades} />
+          <WinRatePieChart trades={filteredTrades} />
         </View>
 
         <View style={styles.chartCard}>
@@ -177,7 +188,7 @@ export default function AnalyticsScreen() {
               <Text style={styles.chartActionText}>View All →</Text>
             </TouchableOpacity>
           </View>
-          <PerformanceByPairChart trades={state.trades} />
+          <PerformanceByPairChart trades={filteredTrades} />
         </View>
       </View>
 
@@ -191,7 +202,7 @@ export default function AnalyticsScreen() {
         <View style={styles.sessionGrid}>
           {Object.entries(metrics.performanceBySession).map(
             ([session, winRate]) => {
-              const sessionTrades = state.trades.filter(t => t.session === session).length;
+              const sessionTrades = filteredTrades.filter(t => t.session === session).length;
               const sessionIcon = session === 'London' ? '🇬🇧' : session === 'NY' ? '🇺🇸' : '🌏';
               const performanceColor = 
                 winRate >= 60 ? '#4caf50' : 
@@ -253,7 +264,7 @@ export default function AnalyticsScreen() {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
             .map(([pair, winRate], index) => {
-              const pairTrades = state.trades.filter(t => t.pair === pair).length;
+              const pairTrades = filteredTrades.filter(t => t.pair === pair).length;
               const rankColor = 
                 index === 0 ? '#ffd700' : 
                 index === 1 ? '#c0c0c0' : 
@@ -329,8 +340,8 @@ export default function AnalyticsScreen() {
             <Text style={styles.insightValue}>
               {(() => {
                 let streak = 0;
-                for (let i = state.trades.length - 1; i >= 0; i--) {
-                  if (state.trades[i].result === 'Win') streak++;
+                for (let i = filteredTrades.length - 1; i >= 0; i--) {
+                  if (filteredTrades[i].result === 'Win') streak++;
                   else break;
                 }
                 return `${streak}W`;
@@ -341,6 +352,26 @@ export default function AnalyticsScreen() {
       </View>
 
       <View style={{ height: 40 }} />
+      <Modal visible={accountModalVisible} animationType="slide" transparent onRequestClose={() => setAccountModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#0d0d0d', borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: '#f5f5f5', fontWeight: '700', fontSize: 16, marginBottom: 12 }}>Select Account</Text>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <TouchableOpacity onPress={() => { setSelectedAccountId('all'); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                <Text style={{ color: '#00d4d4' }}>All Accounts</Text>
+              </TouchableOpacity>
+              {(state.accounts || []).map((acc) => (
+                <TouchableOpacity key={acc.id} onPress={() => { setSelectedAccountId(acc.id); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                  <Text style={{ color: '#f5f5f5' }}>{acc.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setAccountModalVisible(false)} style={{ padding: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#aaa' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

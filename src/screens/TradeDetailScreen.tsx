@@ -1,8 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal } from 'react-native';
+import { useAppContext } from '../hooks/useAppContext';
+import { deleteTrade as deleteTradeService } from '../services/firebaseService';
 
 export default function TradeDetailScreen({ route, navigation }: any) {
   const trade = route?.params?.trade;
+  const { state, dispatch } = useAppContext();
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerUri, setViewerUri] = useState<string>('');
 
   if (!trade) {
     return (
@@ -34,7 +39,14 @@ export default function TradeDetailScreen({ route, navigation }: any) {
   };
 
   return (
+    <>
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Back button */}
+      <View style={{ marginTop: 8, marginBottom: 6 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+          <Text style={{ color: '#00d4d4', fontWeight: '700' }}>← Back</Text>
+        </TouchableOpacity>
+      </View>
       {/* Hero Header */}
       <View style={styles.hero}>
         <View style={styles.heroTop}>
@@ -322,23 +334,51 @@ export default function TradeDetailScreen({ route, navigation }: any) {
             <Text style={styles.sectionIcon}>📸</Text>
           </View>
           <View style={styles.screenshotsCard}>
-            {trade.screenshots.map((screenshot: string, index: number) => (
-              <View key={index} style={styles.screenshotPlaceholder}>
-                <Text style={styles.screenshotText}>Screenshot {index + 1}</Text>
-                <Text style={styles.screenshotSubtext}>Tap to view full size</Text>
-              </View>
-            ))}
+            {trade.screenshots.map((screenshot: any, index: number) => {
+              const uri = typeof screenshot === 'string' ? screenshot : (screenshot?.uri || screenshot?.url || '');
+              return (
+                <TouchableOpacity key={index} style={styles.screenshotImageWrapper} onPress={() => { if (uri) { setViewerUri(uri); setViewerVisible(true); } }}>
+                  {uri ? (
+                    <Image source={{ uri }} style={styles.screenshotImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.screenshotPlaceholder}>
+                      <Text style={styles.screenshotText}>Screenshot {index + 1}</Text>
+                      <Text style={styles.screenshotSubtext}>Tap to view full size</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}
 
       {/* Action Buttons */}
       <View style={styles.actionSection}>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => (navigation as any).navigate('Dashboard', { screen: 'AddTrade', params: { trade } })}>
           <Text style={styles.actionButtonIcon}>✏️</Text>
           <Text style={styles.actionButtonText}>Edit Trade</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.actionButtonSecondary]}
+          onPress={async () => {
+            Alert.alert('Delete Trade', 'Are you sure you want to delete this trade?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: async () => {
+                try {
+                  if (trade?.id) {
+                    await deleteTradeService(trade.id);
+                    try { dispatch({ type: 'DELETE_TRADE', payload: trade.id }); } catch {}
+                    navigation.goBack();
+                  }
+                } catch (err) {
+                  console.error('Failed to delete trade', err);
+                  Alert.alert('Error', 'Failed to delete trade');
+                }
+              }}
+            ]);
+          }}
+        >
           <Text style={styles.actionButtonIcon}>🗑️</Text>
           <Text style={[styles.actionButtonText, { color: '#f44336' }]}>Delete Trade</Text>
         </TouchableOpacity>
@@ -346,6 +386,18 @@ export default function TradeDetailScreen({ route, navigation }: any) {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    {/* Fullscreen image viewer */}
+    <Modal visible={viewerVisible} transparent animationType="fade" onRequestClose={() => setViewerVisible(false)}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => setViewerVisible(false)} style={{ position: 'absolute', top: 40, right: 20, zIndex: 50 }}>
+          <Text style={{ color: '#fff', fontSize: 28 }}>×</Text>
+        </TouchableOpacity>
+        {viewerUri ? (
+          <Image source={{ uri: viewerUri }} style={{ width: '94%', height: '80%', borderRadius: 12 }} resizeMode="contain" />
+        ) : null}
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -742,6 +794,17 @@ const styles = StyleSheet.create({
   },
   screenshotsCard: {
     gap: 12,
+  },
+  screenshotImageWrapper: {
+    width: 160,
+    height: 110,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  screenshotImage: {
+    width: '100%',
+    height: '100%',
   },
   screenshotPlaceholder: {
     backgroundColor: '#1a1a1a',

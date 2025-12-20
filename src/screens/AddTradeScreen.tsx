@@ -25,7 +25,7 @@ import {
   calculateAverageRR,
 } from "../utils/calculations";
 import { Trade, TradeDirection, TradeSession, Strategy } from "../types";
-import { getUserStrategies, addTrade, getUserAccounts } from "../services/firebaseService";
+import { getUserStrategies, addTrade, getUserAccounts, updateAccount, updateTrade } from "../services/firebaseService";
 import { useAppContext } from "../hooks/useAppContext";
 import AccountModal from "../components/AccountModal";
 
@@ -116,6 +116,25 @@ export default function AddTradeScreen({
   const [marketCondition, setMarketCondition] = useState<'Trending'|'Ranging'|'Volatile'|'News'|''>('');
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
   const [pendingTrade, setPendingTrade] = useState<any | null>(null);
+  const editingTrade = route?.params?.trade || null;
+
+  const parseDate = (value: any): Date | null => {
+    if (value === undefined || value === null) return null;
+    if (typeof value?.toDate === 'function') {
+      try {
+        const d = value.toDate();
+        return isNaN(d.getTime()) ? null : d;
+      } catch (e) {
+        return null;
+      }
+    }
+    if (typeof value === 'number') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
   // Responsive / layout
   const [screenWidth, setScreenWidth] = useState<number>(Dimensions.get('window').width);
   const [isSmallScreen, setIsSmallScreen] = useState<boolean>(screenWidth < 380);
@@ -194,6 +213,34 @@ export default function AddTradeScreen({
 
   // Initialize selected account from context if available
   useEffect(() => {
+    // If opened in edit mode, populate fields from the trade passed in
+    try {
+      if (editingTrade) {
+        setPair(editingTrade.pair || 'GBPUSD');
+        setDirection(editingTrade.direction || 'Buy');
+        setSession(editingTrade.session || 'London');
+        setEntryPrice(editingTrade.entryPrice ? String(editingTrade.entryPrice) : '');
+        setStopLoss(editingTrade.stopLoss ? String(editingTrade.stopLoss) : '');
+        setTakeProfit(editingTrade.takeProfit ? String(editingTrade.takeProfit) : '');
+        setActualExit(editingTrade.actualExit ? String(editingTrade.actualExit) : '');
+        setResult(editingTrade.result || '');
+        setSetupType(editingTrade.setupType || '');
+        setEmotion(String(editingTrade.emotionalRating || 5));
+        setRuleDeviation(!!editingTrade.ruleDeviation);
+        setNotes(editingTrade.notes || '');
+        setSelectedChecklist(editingTrade.checklist || []);
+        setScreenshots(editingTrade.screenshots || []);
+        setSelectedAccountId(editingTrade.accountId || (state.accounts && state.accounts[0]?.id) || '');
+        setRiskAmount(editingTrade.riskAmount ? String(editingTrade.riskAmount) : '');
+        const parsed = parseDate(editingTrade.tradeTime) || parseDate(editingTrade.createdAt) || new Date();
+        setTradeDate(parsed);
+        if (parsed) {
+          setTradeTimeText(parsed.toISOString().slice(11,16));
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
     if (state.accounts && state.accounts.length > 0) {
       // If no selected account yet, pick the first
       if (!selectedAccountId) setSelectedAccountId(state.accounts[0].id);
@@ -395,18 +442,84 @@ export default function AddTradeScreen({
         ...pendingTrade,
         screenshots: uploadedScreenshots.filter(Boolean),
       } as Omit<Trade, "id">;
+      if (editingTrade && editingTrade.id) {
+        // Update existing trade
+        await updateTrade(editingTrade.id, toSave as any);
+        try { dispatch({ type: 'UPDATE_TRADE', payload: { ...(editingTrade as any), ...(toSave as any), id: editingTrade.id } }); } catch {}
 
-      const newId = await addTrade(userId, toSave);
-      // Add to local context for immediate UI reflection
-      try {
-        dispatch({ type: 'ADD_TRADE', payload: { ...(toSave as any), id: newId, createdAt: new Date(), updatedAt: new Date() } });
-      } catch (e) {
-        // ignore if dispatch isn't available for some reason
+        // If linked to an account, adjust balance by difference between new and old pnl
+        try {
+          const accountId = (toSave as any).accountId || editingTrade.accountId;
+          if (accountId) {
+            const calcPnl = (t: any) => {
+              if (t?.pnl !== undefined && t?.pnl !== null) return Number(t.pnl) || 0;
+              const risk = Math.abs(Number(t?.riskAmount) || 0);
+              const rr = Number(t?.riskToReward) || 1;
+              if (t?.result === 'Win') return Math.round(risk * rr * 100) / 100;
+              if (t?.result === 'Loss') return Math.round(-risk * 100) / 100;
+              return 0;
+            };
+
+            const oldPnl = calcPnl(editingTrade);
+            const newPnl = calcPnl(toSave as any);
+            const delta = newPnl - oldPnl;
+
+            if (delta !== 0) {
+              const currentAccounts = await getUserAccounts(userId);
+              const acc = currentAccounts.find(a => a.id === accountId);
+              if (acc) {
+                const newBalance = Number(acc.currentBalance || 0) + delta;
+                await updateAccount(accountId, { currentBalance: newBalance });
+                const updatedAccounts = await getUserAccounts(userId);
+                try { dispatch({ type: 'SET_ACCOUNTS', payload: updatedAccounts }); } catch {}
+              }
+            }
+          }
+        } catch (errAcc) {
+          console.error('Failed to update account balance after trade update', errAcc);
+        }
+
+        setShowConfirmation(false);
+        setPendingTrade(null);
+        navigation.goBack();
+        Alert.alert('Success', 'Trade updated');
+      } else {
+        const newId = await addTrade(userId, toSave);
+        try {
+          dispatch({ type: 'ADD_TRADE', payload: { ...(toSave as any), id: newId, createdAt: new Date(), updatedAt: new Date() } });
+        } catch (e) {}
+
+        // If the trade is linked to an account, update the account balance by applying the trade PnL
+        try {
+          const accountId = (toSave as any).accountId;
+          if (accountId) {
+            const tradePnl = (() => {
+              if ((toSave as any).pnl !== undefined && (toSave as any).pnl !== null) return Number((toSave as any).pnl) || 0;
+              const risk = Math.abs(Number((toSave as any).riskAmount) || 0);
+              const rr = Number((toSave as any).riskToReward) || 1;
+              if ((toSave as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
+              if ((toSave as any).result === 'Loss') return Math.round(-risk * 100) / 100;
+              return 0;
+            })();
+
+            const currentAccounts = await getUserAccounts(userId);
+            const acc = currentAccounts.find(a => a.id === accountId);
+            if (acc) {
+              const newBalance = Number(acc.currentBalance || 0) + tradePnl;
+              await updateAccount(accountId, { currentBalance: newBalance });
+              const updatedAccounts = await getUserAccounts(userId);
+              try { dispatch({ type: 'SET_ACCOUNTS', payload: updatedAccounts }); } catch {}
+            }
+          }
+        } catch (errAcc) {
+          console.error('Failed to update account balance after trade', errAcc);
+        }
+
+        setShowConfirmation(false);
+        setPendingTrade(null);
+        navigation.goBack();
+        Alert.alert("Success", `Trade recorded: ${pair} ${direction}`);
       }
-      setShowConfirmation(false);
-      setPendingTrade(null);
-      navigation.goBack();
-      Alert.alert("Success", `Trade recorded: ${pair} ${direction}`);
     } catch (err) {
       console.error('Error saving confirmed trade', err);
       Alert.alert('Error', 'Failed to save trade. Please try again.');
@@ -430,10 +543,20 @@ export default function AddTradeScreen({
       keyboardDismissMode="interactive"
       nestedScrollEnabled={true}
     >
-      {/* Header */}
+      {/* Header with back button */}
       <View style={styles.header}>
-        <Text style={styles.title}>Add New Trade</Text>
-        <Text style={styles.subtitle}>Record your trading setup and execution</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+            <Text style={{ color: '#00d4d4', fontWeight: '700', fontSize: 16 }}>← Back</Text>
+          </TouchableOpacity>
+
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={styles.title}>{editingTrade ? 'Edit Trade' : 'Add New Trade'}</Text>
+            <Text style={styles.subtitle}>Record your trading setup and execution</Text>
+          </View>
+
+          <View style={{ width: 64 }} />
+        </View>
       </View>
 
       {/* Live Calculation Cards */}
@@ -631,7 +754,7 @@ export default function AddTradeScreen({
               <Text style={styles.inputLabel}>Entry Date</Text>
               <TextInput
                 style={styles.priceInput}
-                value={tradeDate.toISOString().slice(0,10)}
+                value={tradeDate && !isNaN(tradeDate.getTime()) ? tradeDate.toISOString().slice(0,10) : ''}
                 onChangeText={(t) => {
                   const d = new Date(t);
                   if (!isNaN(d.getTime())) setTradeDate(d);

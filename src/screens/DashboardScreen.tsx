@@ -29,7 +29,7 @@ import {
   assignGrade,
 } from "../utils/calculations";
 import { Trade, TradeDirection, TradeSession, Strategy } from "../types";
-import { getUserStrategies, addTrade } from "../services/firebaseService";
+import { getUserStrategies, addTrade, getUserAccounts, updateAccount } from "../services/firebaseService";
 
 // Shared date parsing helper (handles Firestore Timestamp, number, string, Date)
 const parseDate = (value: any): Date | null => {
@@ -64,13 +64,20 @@ export default function DashboardScreen() {
   const navigation = useNavigation();
   const scrollRef = useRef<any>(null);
 
-  
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [accountModalVisible, setAccountModalVisible] = useState<boolean>(false);
 
   const trades = state.trades || [];
-  const equitySeries = React.useMemo(() => {
-    if (!trades || trades.length === 0) return [];
 
-    const withDates = trades
+  const filteredTrades = React.useMemo(() => {
+    if (!trades || trades.length === 0) return [];
+    if (!selectedAccountId || selectedAccountId === 'all') return trades;
+    return trades.filter((t) => String(t.accountId || '') === String(selectedAccountId));
+  }, [trades, selectedAccountId]);
+  const equitySeries = React.useMemo(() => {
+    if (!filteredTrades || filteredTrades.length === 0) return [];
+
+    const withDates = filteredTrades
       .map((t) => ({ t, date: parseDate((t as any).createdAt) }))
       .filter((x) => x.date !== null) as { t: Trade; date: Date }[];
 
@@ -88,10 +95,10 @@ export default function DashboardScreen() {
         value: acc,
       };
     });
-  }, [trades]);
+  }, [filteredTrades]);
   
-  const winLossRatio = calculateWinLossRatio(trades);
-  const pnlStats = calculatePnL(trades);
+  const winLossRatio = calculateWinLossRatio(filteredTrades);
+  const pnlStats = calculatePnL(filteredTrades);
 
   const todayEmotionalRating = state.psychologyLogs?.[0]?.emotionalState || 0;
   const avgConfluenceScore =
@@ -117,17 +124,21 @@ export default function DashboardScreen() {
   return (
     <ScreenLayout style={{ backgroundColor: colors.background }}>
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
-        {/* Enhanced Header with Gradient Accent */}
+        {/* Enhanced Header with account selector */}
         <View style={styles.header}>
-          <View style={styles.headerGradient}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Caprianne Trdz
-            </Text>
-            <View style={styles.accentLine} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>Caprianne Trdz</Text>
+              <View style={styles.accentLine} />
+            </View>
+
+            <TouchableOpacity onPress={() => setAccountModalVisible(true)} style={{ padding: 8 }}>
+              <Text style={{ color: colors.highlight, fontWeight: '700' }}>{
+                (selectedAccountId === 'all' ? 'All Accounts' : (state.accounts.find(a => a.id === selectedAccountId)?.name || 'Select Account'))
+              }</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={[styles.subtitle, { color: colors.subtext }]}>
-            Trading Performance Dashboard
-          </Text>
+          <Text style={[styles.subtitle, { color: colors.subtext }]}>Trading Performance Dashboard</Text>
         </View>
 
         {/* Enhanced Quick Stats Grid */}
@@ -232,7 +243,7 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <CalendarHeatmap
-                trades={trades}
+                trades={filteredTrades}
                 onDayPress={(date) => setSelectedDate(date)}
                 theme={mode}
               />
@@ -245,8 +256,8 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.gradeContainer}>
                 {(["A+", "A", "B", "C", "D"] as const).map((grade) => {
-                  const count = trades.filter((t) => t.grade === grade).length;
-                  const total = trades.length || 1;
+                  const count = filteredTrades.filter((t) => t.grade === grade).length;
+                  const total = filteredTrades.length || 1;
                   const percentage = (count / total) * 100;
                   
                   return (
@@ -280,7 +291,7 @@ export default function DashboardScreen() {
 
           <View style={isWeb ? styles.rightCol : undefined}>
             <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
-              <WeeklySummaryPanel trades={trades} />
+              <WeeklySummaryPanel trades={filteredTrades} />
             </View>
           </View>
         </View>
@@ -288,10 +299,32 @@ export default function DashboardScreen() {
         {!isWeb && (
           <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <WeeklySummaryPanel trades={trades} layout="horizontal" />
+              <WeeklySummaryPanel trades={filteredTrades} layout="horizontal" />
             </ScrollView>
           </View>
         )}
+
+        {/* Account selector modal (triggered from header) */}
+        <Modal visible={accountModalVisible} animationType="slide" transparent onRequestClose={() => setAccountModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, marginBottom: 12 }}>Select Account</Text>
+              <ScrollView style={{ maxHeight: 400 }}>
+                <TouchableOpacity onPress={() => { setSelectedAccountId('all'); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                  <Text style={{ color: colors.highlight }}>All Accounts</Text>
+                </TouchableOpacity>
+                {(state.accounts || []).map((acc) => (
+                  <TouchableOpacity key={acc.id} onPress={() => { setSelectedAccountId(acc.id); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                    <Text style={{ color: colors.text }}>{acc.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity onPress={() => setAccountModalVisible(false)} style={{ padding: 12, alignItems: 'center' }}>
+                <Text style={{ color: colors.subtext }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* Enhanced Action Buttons */}
         <View style={styles.actionButtons}>
@@ -311,11 +344,11 @@ export default function DashboardScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Floating Add Trade Button (mobile) */}
-      {!isWeb && showFab && (
+      {/* Floating Add Trade Button */}
+      {showFab && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => (navigation as any).navigate('AddTrade')}
+          onPress={() => (navigation as any).navigate('Dashboard', { screen: 'AddTrade' })}
           activeOpacity={0.9}
         >
           <Text style={styles.fabIcon}>＋</Text>
@@ -327,7 +360,7 @@ export default function DashboardScreen() {
         animationType="none"
         onRequestClose={() => setShowAddTrade(false)}
       >
-        <AddTradeModalAnimated
+          <AddTradeModalAnimated
           visible={showAddTrade}
           onClose={() => setShowAddTrade(false)}
           onSubmit={async (trade: any) => {
@@ -347,7 +380,33 @@ export default function DashboardScreen() {
                 type: 'ADD_TRADE', 
                 payload: { ...trade, id: tradeId, userId } 
               });
-              
+
+              // If linked to an account, update that account's balance by applying trade PnL
+              try {
+                const accountId = trade.accountId;
+                if (accountId) {
+                  const tradePnl = (() => {
+                    if ((trade as any).pnl !== undefined && (trade as any).pnl !== null) return Number((trade as any).pnl) || 0;
+                    const risk = Math.abs(Number((trade as any).riskAmount) || 0);
+                    const rr = Number((trade as any).riskToReward) || 1;
+                    if ((trade as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
+                    if ((trade as any).result === 'Loss') return Math.round(-risk * 100) / 100;
+                    return 0;
+                  })();
+
+                  const currentAccounts = await getUserAccounts(userId);
+                  const acc = currentAccounts.find((a: any) => a.id === accountId);
+                  if (acc) {
+                    const newBalance = Number(acc.currentBalance || 0) + tradePnl;
+                    await updateAccount(accountId, { currentBalance: newBalance });
+                    const updatedAccounts = await getUserAccounts(userId);
+                    try { dispatch({ type: 'SET_ACCOUNTS', payload: updatedAccounts }); } catch {}
+                  }
+                }
+              } catch (errAcc) {
+                console.error('Failed to update account balance after trade', errAcc);
+              }
+
               setShowAddTrade(false);
               Alert.alert("Success", "Trade recorded successfully");
             } catch (error) {
@@ -366,7 +425,7 @@ export default function DashboardScreen() {
         <DayTradesModalAnimated
           visible={!!selectedDate}
           date={selectedDate}
-          trades={trades}
+          trades={filteredTrades}
           onClose={() => setSelectedDate(null)}
         />
       </Modal>

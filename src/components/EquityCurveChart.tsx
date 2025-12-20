@@ -8,7 +8,7 @@ interface EquityCurveChartProps {
 }
 
 export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
-  const width = Dimensions.get("window").width - 32;
+  const internalWidth = 800;
   const height = 220;
   const padding = 40;
 
@@ -57,7 +57,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
   const range = maxValue - minValue || 1;
 
   // Calculate points for polyline
-  const chartWidth = width - padding * 2;
+  const chartWidth = internalWidth - padding * 2;
   const chartHeight = height - padding * 2;
   const pointSpacing = chartWidth / (equityPoints.length - 1 || 1);
 
@@ -80,7 +80,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
     })
     .join(" ");
   
-  const areaPolygon = `${areaPoints} ${width - padding},${height - padding} ${padding},${height - padding}`;
+  const areaPolygon = `${areaPoints} ${internalWidth - padding},${height - padding} ${padding},${height - padding}`;
 
   // Grid lines
   const gridLines = [];
@@ -93,7 +93,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
         key={`grid-${i}`}
         x1={padding}
         y1={y}
-        x2={width - padding}
+        x2={internalWidth - padding}
         y2={y}
         stroke="rgba(255,255,255,0.05)"
         strokeWidth="1"
@@ -128,7 +128,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
         </View>
       </View>
 
-      <Svg width={width} height={height}>
+      <Svg width={'100%'} height={height} viewBox={`0 0 ${internalWidth} ${height}`} preserveAspectRatio="xMidYMid meet">
         <Defs>
           <LinearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor="#00d4d4" stopOpacity="0.2" />
@@ -144,7 +144,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
           <Line
             x1={padding}
             y1={height - padding - ((0 - minValue) / range) * chartHeight}
-            x2={width - padding}
+            x2={internalWidth - padding}
             y2={height - padding - ((0 - minValue) / range) * chartHeight}
             stroke="#f44336"
             strokeWidth="1"
@@ -170,7 +170,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
         <Line
           x1={padding}
           y1={height - padding}
-          x2={width - padding}
+          x2={internalWidth - padding}
           y2={height - padding}
           stroke="#00d4d4"
           strokeWidth="2"

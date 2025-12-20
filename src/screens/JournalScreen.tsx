@@ -7,7 +7,8 @@ import {
   TextInput, 
   TouchableOpacity, 
   FlatList,
-  Platform 
+  Platform,
+  Modal,
 } from 'react-native';
 import { useAppContext } from '../hooks/useAppContext';
 
@@ -18,11 +19,14 @@ export default function JournalScreen({ navigation }: any) {
   const [filterPair, setFilterPair] = useState('');
   const [filterResult, setFilterResult] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'grade' | 'rr'>('date');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [accountModalVisible, setAccountModalVisible] = useState<boolean>(false);
 
-  const filteredTrades = state.trades
+  const filteredTrades = (state.trades || [])
     .filter((trade) => {
       if (filterPair && !trade.pair.toUpperCase().includes(filterPair.toUpperCase())) return false;
       if (filterResult && trade.result !== filterResult) return false;
+      if (selectedAccountId && selectedAccountId !== 'all' && String(trade.accountId || '') !== String(selectedAccountId)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -36,13 +40,16 @@ export default function JournalScreen({ navigation }: any) {
       }
     });
 
+  const baseForStats = (selectedAccountId && selectedAccountId !== 'all') ? (state.trades || []).filter(t => String(t.accountId || '') === String(selectedAccountId)) : (state.trades || []);
+
   const stats = {
-    total: state.trades.length,
-    wins: state.trades.filter(t => t.result === 'Win').length,
-    losses: state.trades.filter(t => t.result === 'Loss').length,
-    winRate: state.trades.length > 0 
-      ? ((state.trades.filter(t => t.result === 'Win').length / state.trades.length) * 100).toFixed(1)
-      : '0',
+    // Stats reflect currently selected account (not search filters)
+    total: baseForStats.length,
+    wins: baseForStats.filter(t => t.result === 'Win').length,
+    losses: baseForStats.filter(t => t.result === 'Loss').length,
+    winRate: (() => {
+      return baseForStats.length > 0 ? ((baseForStats.filter(t => t.result === 'Win').length / baseForStats.length) * 100).toFixed(1) : '0';
+    })(),
   };
 
   const renderTradeCard = ({ item }: any) => {
@@ -151,7 +158,12 @@ export default function JournalScreen({ navigation }: any) {
     }} scrollEventThrottle={16}>
       {/* Header with Stats */}
       <View style={styles.header}>
-        <Text style={styles.title}>Trade Journal</Text>
+        <View>
+          <Text style={styles.title}>Trade Journal</Text>
+        </View>
+        <TouchableOpacity onPress={() => setAccountModalVisible(true)} style={{ padding: 8 }}>
+          <Text style={{ color: '#00d4d4', fontWeight: '700' }}>{selectedAccountId === 'all' ? 'All Accounts' : (state.accounts.find(a => a.id === selectedAccountId)?.name || 'Select Account')}</Text>
+        </TouchableOpacity>
         <View style={styles.statsBar}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{stats.total}</Text>
@@ -287,6 +299,26 @@ export default function JournalScreen({ navigation }: any) {
           <Text style={styles.journalFabIcon}>＋</Text>
         </TouchableOpacity>
       )}
+      <Modal visible={accountModalVisible} animationType="slide" transparent onRequestClose={() => setAccountModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#0d0d0d', borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: '#f5f5f5', fontWeight: '700', fontSize: 16, marginBottom: 12 }}>Select Account</Text>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <TouchableOpacity onPress={() => { setSelectedAccountId('all'); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                <Text style={{ color: '#00d4d4' }}>All Accounts</Text>
+              </TouchableOpacity>
+              {(state.accounts || []).map((acc) => (
+                <TouchableOpacity key={acc.id} onPress={() => { setSelectedAccountId(acc.id); setAccountModalVisible(false); }} style={{ padding: 12 }}>
+                  <Text style={{ color: '#f5f5f5' }}>{acc.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setAccountModalVisible(false)} style={{ padding: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#aaa' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -312,6 +344,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
+    zIndex: 60,
   },
   journalFabIcon: {
     fontSize: 26,

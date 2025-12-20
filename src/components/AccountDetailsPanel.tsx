@@ -6,12 +6,14 @@ interface AccountDetailsPanelProps {
   account: TradingAccount;
   onEdit?: () => void;
   onDelete?: () => void;
+  onTransaction?: (accountId: string, newBalance: number) => Promise<void> | void;
 }
 
 export default function AccountDetailsPanel({
   account,
   onEdit,
   onDelete,
+  onTransaction,
 }: AccountDetailsPanelProps) {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
@@ -22,8 +24,28 @@ export default function AccountDetailsPanel({
   const isProfit = balanceChange >= 0;
 
   const handleTransaction = () => {
-    // Handle deposit/withdrawal logic here
-    console.log(`${transactionType}: $${amount}`);
+    // Parse amount and apply transaction via callback if provided
+    const parsed = Number(amount) || 0;
+    if (parsed <= 0) {
+      // ignore or show error
+      setShowTransactionModal(false);
+      setAmount('');
+      return;
+    }
+
+    const newBalance = transactionType === 'deposit'
+      ? Number(account.currentBalance || 0) + parsed
+      : Number(account.currentBalance || 0) - parsed;
+
+    if (onTransaction) {
+      try {
+        // allow parent to persist and refresh accounts
+        onTransaction(account.id, newBalance);
+      } catch (err) {
+        console.error('Transaction error', err);
+      }
+    }
+
     setShowTransactionModal(false);
     setAmount('');
   };

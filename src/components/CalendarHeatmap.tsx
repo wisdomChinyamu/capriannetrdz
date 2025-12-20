@@ -35,9 +35,10 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
   const year = yearIdx;
   const month = monthIndex;
 
-  const scaleAnimations = useRef<Record<string, Animated.Value>>({}).current;
+  const widthAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const isTablet = windowWidth >= breakpoints.tablet;
   const isDesktop = windowWidth >= breakpoints.desktop;
 
@@ -83,9 +84,24 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
 
     if (dayTrades.length === 0) return colors.neutral;
 
-    const totalPnL = dayTrades.reduce((sum, t) => sum + (t.result === 'Win' ? 1 : t.result === 'Loss' ? -1 : 0), 0);
+    const tradePnL = (t: Trade) => {
+      // Prefer explicit pnl
+      if ((t as any).pnl !== undefined && (t as any).pnl !== null) return Number((t as any).pnl) || 0;
+      // Derive from risk amount and R:R when result exists
+      const risk = Math.abs(Number((t as any).riskAmount) || 0);
+      const rr = Number((t as any).riskToReward) || 1;
+      if ((t as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
+      if ((t as any).result === 'Loss') return Math.round(-risk * 100) / 100;
+      return 0;
+    };
 
-    const maxAbsPnL = Math.max(1, ...Object.keys(tradesByDate).map((k) => Math.abs(tradesByDate[k].reduce((s, t) => s + (t.result === 'Win' ? 1 : t.result === 'Loss' ? -1 : 0), 0))));
+    const totalPnL = dayTrades.reduce((sum, t) => sum + tradePnL(t), 0);
+
+    const maxAbsPnL = Math.max(
+      1,
+      ...Object.keys(tradesByDate).map((k) => Math.abs(tradesByDate[k].reduce((s, t) => s + tradePnL(t), 0)))
+    );
+
     const intensity = Math.min(1, Math.abs(totalPnL) / maxAbsPnL);
 
     if (totalPnL > 0) {
@@ -102,57 +118,65 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const weeks: (number | null)[][] = Array.from({ length: Math.ceil(days.length / 7) }, (_, i) =>
-    days.slice(i * 7, (i + 1) * 7)
-  );
+  // Build weeks as rows of 7, padding the final week with nulls so each week has 7 cells
+  const weeks: (number | null)[][] = (() => {
+    const count = Math.ceil(days.length / 7);
+    const out: (number | null)[][] = [];
+    for (let i = 0; i < count; i++) {
+      const start = i * 7;
+      const week = days.slice(start, start + 7);
+      while (week.length < 7) week.push(null);
+      out.push(week);
+    }
+    return out;
+  })();
 
-  const [tooltip, setTooltip] = useState<null | { date: string; count: number; pnl: number }>(null);
   const [focusedDay, setFocusedDay] = useState<number | null>(null);
 
-  const handleMouseEnter = (day: number) => {
-    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayTrades = tradesByDate[dateKey] || [];
-    const pnl = dayTrades.reduce((s, t) => s + (t.result === 'Win' ? 1 : -1), 0);
-    setTooltip({ date: dateKey, count: dayTrades.length, pnl });
-  };
-
-  const handleMouseLeave = () => setTooltip(null);
-
-  const handleFocus = (day: number) => {
-    handleMouseEnter(day);
+  // Use scale animations (1 = normal). We animate transform scale so layout width stays percentage-based
+  const handleMouseEnter = (day: number, dayKey: string) => {
+    if (!widthAnimations[dayKey]) widthAnimations[dayKey] = new Animated.Value(1);
+    Animated.timing(widthAnimations[dayKey], {
+      toValue: 1.08,
+      duration: 160,
+      useNativeDriver: false,
+    }).start();
     setFocusedDay(day);
   };
 
-  const handleBlur = () => {
-    handleMouseLeave();
+  const handleMouseLeave = (dayKey: string) => {
+    if (!widthAnimations[dayKey]) widthAnimations[dayKey] = new Animated.Value(1);
+    Animated.timing(widthAnimations[dayKey], {
+      toValue: 1,
+      duration: 120,
+      useNativeDriver: false,
+    }).start();
     setFocusedDay(null);
   };
 
-  const getScaleAnimatedValue = (dayKey: string) => {
-    if (!scaleAnimations[dayKey]) {
-      scaleAnimations[dayKey] = new Animated.Value(1);
+  const handleFocus = (day: number, dayKey: string) => {
+    handleMouseEnter(day, dayKey);
+  };
+
+  const handleBlur = (dayKey: string) => {
+    handleMouseLeave(dayKey);
+  };
+
+  const getWidthAnimatedValue = (dayKey: string) => {
+    if (!widthAnimations[dayKey]) {
+      widthAnimations[dayKey] = new Animated.Value(1);
     }
-    return scaleAnimations[dayKey];
+    return widthAnimations[dayKey];
   };
 
   const handleDayCellPressIn = (dayKey: string) => {
-    const scaleValue = getScaleAnimatedValue(dayKey);
-    Animated.spring(scaleValue, {
-      toValue: 0.9,
-      useNativeDriver: Platform.OS !== 'web',
-      tension: 100,
-      friction: 8,
-    }).start();
+    const w = getWidthAnimatedValue(dayKey);
+    Animated.spring(w, { toValue: 0.95, useNativeDriver: false }).start();
   };
 
   const handleDayCellPressOut = (dayKey: string) => {
-    const scaleValue = getScaleAnimatedValue(dayKey);
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: Platform.OS !== 'web',
-      tension: 100,
-      friction: 8,
-    }).start();
+    const w = getWidthAnimatedValue(dayKey);
+    Animated.spring(w, { toValue: 1, useNativeDriver: false }).start();
   };
 
   const goToPrevMonth = () => {
@@ -179,28 +203,32 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
     setYearIdx(today.getFullYear());
   };
 
-  const getResponsiveCellWidth = (): any => {
-    if (isDesktop) {
-      return { flex: 0, width: '12%', minWidth: 50 };
-    }
-    if (isTablet) {
-      return { flex: 0, width: '13%', minWidth: 45 };
-    }
-    return { flex: 0, width: '14.28%', minWidth: 38 };
+  const getResponsiveCellPixelWidth = (): number => {
+    // kept for legacy uses; prefer percentage widths
+    const totalGap = 4 * 6;
+    const base = containerWidth || windowWidth;
+    const available = Math.max(280, base - totalGap);
+    return Math.floor(available / 7);
   };
 
-  const getResponsiveLabelWidth = (): any => {
-    if (isDesktop) {
-      return { flex: 0, width: '12%', minWidth: 50 };
+  // Compute cell percent based on measured container width and gaps so cells don't overflow labels
+  const cellPercent = (() => {
+    const gapPx = 4; // per-cell right gap
+    const gapsPerRow = 6; // between 7 cells
+    const totalGapPx = gapPx * gapsPerRow;
+    if (containerWidth && containerWidth > 0) {
+      const percent = ((containerWidth - totalGapPx) / containerWidth) / 7 * 100;
+      // reduce slightly to leave breathing room
+      return `${Math.max(12, percent - 0.4).toFixed(4)}%`;
     }
-    if (isTablet) {
-      return { flex: 0, width: '13%', minWidth: 45 };
-    }
-    return { flex: 0, width: '14.28%', minWidth: 38 };
-  };
+    return '13.9%';
+  })();
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { position: 'relative', paddingTop: 44 }]}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+    >
       {/* Header with Navigation */}
       <View style={styles.header}>
         <View>
@@ -237,110 +265,89 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
         </View>
       </View>
 
-      {/* Tooltip */}
-      {tooltip && (
-        <View style={[styles.tooltip, { backgroundColor: colors.surface }]}> 
-          <View style={styles.tooltipHeader}>
-            <Text style={[styles.tooltipDate, { color: colors.text }]}>
-              {new Date(tooltip.date).toLocaleDateString('default', { month: 'short', day: 'numeric' })}
-            </Text>
-            <View style={[
-              styles.tooltipBadge,
-              { backgroundColor: tooltip.pnl > 0 ? '#4caf5020' : tooltip.pnl < 0 ? '#f4433620' : '#2a2a2a' }
-            ]}>
-              <Text style={[
-                styles.tooltipPnl,
-                { color: tooltip.pnl > 0 ? colors.profitEnd : tooltip.pnl < 0 ? colors.lossEnd : colors.subtext }
-              ]}>
-                {tooltip.pnl > 0 ? '+' : ''}{tooltip.pnl}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.tooltipTrades, { color: colors.subtext }]}>
-            {tooltip.count} {tooltip.count === 1 ? 'trade' : 'trades'}
-          </Text>
-        </View>
-      )}
+      {/* Removed tooltip preview — hover now expands a day and pushes neighbors (handled in cell handlers). */}
 
       {/* Calendar Grid */}
       <View style={styles.calendar}>
         {/* Day Headers */}
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
-          <Text key={`${day}-${idx}`} style={[styles.dayLabel, { color: colors.subtext }, getResponsiveLabelWidth()]}>
+      <View style={styles.dayHeaderRow}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+          <Text key={`${day}-${idx}`} style={[styles.dayLabel, { color: colors.subtext, width: (cellPercent as any) }]}>
             {day}
           </Text>
         ))}
+      </View>
 
         {/* Day Cells */}
-        {weeks.map((week, weekIdx) =>
-          week.map((day, dayIdx) => {
-            const dayKey = `${weekIdx}-${dayIdx}`;
-            const scaleValue = getScaleAnimatedValue(dayKey);
-            const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
-            
-            return (
-              <Animated.View
-                key={dayKey}
-                style={[
-                  getResponsiveCellWidth(),
-                  {
-                    transform: [{ scale: scaleValue }],
-                  },
-                ]}
-              >
-                <Pressable
-                  accessible
-                  accessibilityRole="button"
-                  // @ts-ignore
-                  tabIndex={day ? 0 : -1}
-                  // @ts-ignore
-                  onKeyDown={(e: any) => {
-                    if (!day) return;
-                    const k = e?.key || (e?.nativeEvent && e.nativeEvent.key);
-                    if (k === 'Enter' || k === ' ') onDayPress?.(new Date(year, month, day));
-                  }}
-                  onFocus={() => day && handleFocus(day)}
-                  onBlur={() => day && handleBlur()}
-                  onPressIn={() => day && handleDayCellPressIn(dayKey)}
-                  onPressOut={() => day && handleDayCellPressOut(dayKey)}
-                  style={({ pressed }) => [
-                    styles.dayCell,
-                    {
-                      backgroundColor: day ? getDayColor(day) : 'transparent',
-                      opacity: pressed ? 0.8 : 1,
-                      borderWidth: isToday ? 2 : focusedDay === day ? 2 : 1,
-                      borderColor: isToday ? colors.highlight : focusedDay === day ? colors.highlight : 'rgba(255,255,255,0.1)',
-                    },
-                  ]}
-                  onPress={() => day && onDayPress?.(new Date(year, month, day))}
-                  // @ts-ignore
-                  onMouseEnter={() => day && handleMouseEnter(day)}
-                  // @ts-ignore
-                  onMouseLeave={() => day && handleMouseLeave()}
-                  disabled={!day}
-                >
-                  {day && (
-                    <View style={styles.dayContent}>
-                      <Text style={[styles.dayText, { color: colors.text }]}>{day}</Text>
-                      {(() => {
-                        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const dayTrades = tradesByDate[dateKey] || [];
-                        if (dayTrades.length > 0) {
-                          return (
-                            <View style={styles.tradeDot}>
-                              <Text style={styles.tradeDotText}>{dayTrades.length}</Text>
-                            </View>
-                          );
-                        }
-                      })()}
-                    </View>
-                  )}
-                </Pressable>
-              </Animated.View>
-            );
-          })
-        )}
-      </View>
+        <View style={styles.calendarGrid}>
+          {weeks.map((week, weekIdx) => (
+            <View key={`week-${weekIdx}`} style={styles.weekRow}>
+              {week.map((day, dayIdx) => {
+                const dayKey = `${weekIdx}-${dayIdx}`;
+                const scaleAnim = getWidthAnimatedValue(dayKey);
+                const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+
+                return (
+                  <Animated.View
+                    key={dayKey}
+                    style={[
+                      { width: (cellPercent as any), marginRight: 4, marginBottom: 4, transform: [{ scale: scaleAnim }] },
+                    ]}
+                  >
+                    <Pressable
+                      accessible
+                      accessibilityRole="button"
+                      // @ts-ignore
+                      tabIndex={day ? 0 : -1}
+                      // @ts-ignore
+                      onKeyDown={(e: any) => {
+                        if (!day) return;
+                        const k = e?.key || (e?.nativeEvent && e.nativeEvent.key);
+                        if (k === 'Enter' || k === ' ') onDayPress?.(new Date(year, month, day));
+                      }}
+                      onFocus={() => day && handleFocus(day, dayKey)}
+                      onBlur={() => day && handleBlur(dayKey)}
+                      onPressIn={() => day && handleDayCellPressIn(dayKey)}
+                      onPressOut={() => day && handleDayCellPressOut(dayKey)}
+                      style={({ pressed }) => [
+                      styles.dayCell,
+                        {
+                          backgroundColor: day ? getDayColor(day) : 'transparent',
+                          opacity: pressed ? 0.9 : 1,
+                          borderWidth: isToday ? 2 : focusedDay === day ? 2 : 1,
+                          borderColor: isToday ? colors.highlight : focusedDay === day ? colors.highlight : 'rgba(255,255,255,0.1)',
+                        },
+                      ]}
+                      onPress={() => day && onDayPress?.(new Date(year, month, day))}
+                      // @ts-ignore
+                      onMouseEnter={() => day && handleMouseEnter(day, dayKey, defaultWidth)}
+                      // @ts-ignore
+                      onMouseLeave={() => day && handleMouseLeave(dayKey, defaultWidth)}
+                      disabled={!day}
+                    >
+                      {day && (
+                        <View style={[styles.dayContent, { aspectRatio: 1, width: '100%' }]}>
+                          <Text style={[styles.dayText, { color: colors.text }]}>{day}</Text>
+                          {(() => {
+                            const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const dayTrades = tradesByDate[dateKey] || [];
+                            if (dayTrades.length > 0) {
+                              return (
+                                <View style={styles.tradeDot}>
+                                  <Text style={styles.tradeDotText}>{dayTrades.length}</Text>
+                                </View>
+                              );
+                            }
+                          })()}
+                        </View>
+                      )}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
 
       {/* Legend */}
       <View style={styles.legend}>
@@ -354,6 +361,7 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
           <Text style={[styles.legendLabel, { color: colors.subtext }]}>Losses</Text>
         </View>
       </View>
+    </View>
     </View>
   );
 }
@@ -439,6 +447,30 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'flex-start',
   },
+  dayHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    width: '100%',
+    marginBottom: 4,
+  },
+  calendarGrid: {
+    flexDirection: 'column',
+    gap: 4,
+    justifyContent: 'flex-start',
+    width: '100%'
+  },
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  tooltipAbsolute: {
+    position: 'absolute',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 212, 0.2)',
+    zIndex: 50,
+  },
   dayLabel: {
     width: '14.28%',
     textAlign: 'center',
@@ -449,7 +481,6 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: '100%',
-    aspectRatio: 1,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

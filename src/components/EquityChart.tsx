@@ -7,13 +7,11 @@ type Point = { x: number; y: number };
 
 export default function EquityChart({ series, height = 180 }: { series: { date: string; value: number }[]; height?: number }) {
   const { colors } = useTheme();
-  const windowWidth = Dimensions.get('window').width;
-  const width = Platform.OS === 'web'
-    ? Math.max(400, windowWidth - 80)
-    : Math.max(300, windowWidth - 80);
 
+  // Use a scalable viewBox so the SVG fits its container without overflowing.
+  const internalWidth = 800;
   const padding = { top: 20, right: 40, bottom: 30, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
+  const chartWidth = internalWidth - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const min = Math.min(0, ...(series.map(s => s.value)));
@@ -62,8 +60,8 @@ export default function EquityChart({ series, height = 180 }: { series: { date: 
   }
 
   return (
-    <View>
-      <Svg width={width} height={height}>
+    <View style={{ width: '100%' }}>
+      <Svg width={'100%'} height={height} viewBox={`0 0 ${internalWidth} ${height}`} preserveAspectRatio="xMidYMid meet">
         <Defs>
           <LinearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={colors.highlight} stopOpacity="0.3" />

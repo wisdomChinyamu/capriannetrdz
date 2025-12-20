@@ -71,6 +71,19 @@ const AccountsScreen = () => {
     }
   };
 
+  const handleTransaction = async (accountId: string, newBalance: number) => {
+    try {
+      await updateAccount(accountId, { currentBalance: newBalance });
+      if (state.user?.uid) {
+        const updatedAccounts = await getUserAccounts(state.user.uid);
+        dispatch({ type: 'SET_ACCOUNTS', payload: updatedAccounts });
+      }
+    } catch (error) {
+      console.error('Error applying transaction:', error);
+      Alert.alert('Error', 'Failed to apply transaction');
+    }
+  };
+
   const openEditModal = (account: TradingAccount) => {
     setEditingAccount(account);
     setIsModalVisible(true);
@@ -107,11 +120,12 @@ const AccountsScreen = () => {
         ) : (
           state.accounts.map((account) => (
             <AccountCard 
-              key={account.id} 
-              account={account} 
-              onEdit={() => openEditModal(account)}
-              onDelete={() => handleDeleteAccount(account.id)}
-            />
+                key={account.id} 
+                account={account} 
+                onEdit={() => openEditModal(account)}
+                onDelete={() => handleDeleteAccount(account.id)}
+                onTransaction={handleTransaction}
+              />
 
           ))
         )}
