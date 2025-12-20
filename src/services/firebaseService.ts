@@ -140,7 +140,8 @@ export function observeAuthState(callback: (user: any) => void) {
 export async function createAccount(
   userId: string,
   name: string,
-  startingBalance: number
+  startingBalance: number,
+  accountType: 'demo' | 'live' = 'demo'
 ) {
   try {
     // Check if Firebase is properly initialized
@@ -155,6 +156,7 @@ export async function createAccount(
       name,
       startingBalance,
       currentBalance: startingBalance,
+      type: accountType,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
@@ -731,9 +733,12 @@ export async function updateRoutineItem(
       }
       return item;
     });
-    
+
+    // Clean each item to remove any undefined fields inside the items array
+    const cleanedItems = finalUpdatedItems.map((item: any) => removeUndefinedFields(item));
+
     const updateData = removeUndefinedFields({
-      items: finalUpdatedItems,
+      items: cleanedItems,
       updatedAt: Timestamp.now(),
     });
     

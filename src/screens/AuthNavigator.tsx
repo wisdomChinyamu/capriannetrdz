@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, Text, StyleSheet, Animated } from "react-native";
 import { auth } from "../config/firebase";
-import { observeAuthState } from "../services/firebaseService";
+import { observeAuthState, getUserAccounts, getUserTrades } from "../services/firebaseService";
 import { TabNavigator } from "../navigation/TabNavigator";
 import LoginScreen from "./LoginScreen";
 import SignUpScreen from "./SignUpScreen";
@@ -48,6 +48,22 @@ export default function AuthNavigator() {
             createdAt: new Date(),
           }
         });
+        // Load user's accounts and trades into context
+        (async () => {
+          try {
+            const accounts = await getUserAccounts(currentUser.uid);
+            dispatch({ type: 'SET_ACCOUNTS', payload: accounts });
+          } catch (e) {
+            console.error('Failed to load accounts on auth state change', e);
+          }
+
+          try {
+            const trades = await getUserTrades(currentUser.uid);
+            dispatch({ type: 'SET_TRADES', payload: trades });
+          } catch (e) {
+            console.error('Failed to load trades on auth state change', e);
+          }
+        })();
       } else {
         dispatch({
           type: 'SET_USER',

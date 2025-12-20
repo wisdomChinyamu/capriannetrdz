@@ -93,7 +93,7 @@ export default function RoutineScreen() {
             if (item.completed) {
               await updateRoutineItem(activeRoutine.id, item.id, {
                 completed: false,
-                completedAt: undefined,
+                completedAt: null,
               });
             }
           }
@@ -249,7 +249,7 @@ export default function RoutineScreen() {
 
       await updateRoutineItem(activeRoutine.id, itemId, {
         completed: !item.completed,
-        completedAt: !item.completed ? new Date() : undefined,
+        completedAt: !item.completed ? new Date() : null,
       });
       
       // Refresh routines

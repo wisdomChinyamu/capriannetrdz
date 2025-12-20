@@ -5,6 +5,7 @@ import { Trade } from "../types";
 
 interface WeeklySummaryPanelProps {
   trades: Trade[];
+  layout?: 'horizontal' | 'vertical';
 }
 
 function getWeekRanges(
@@ -26,6 +27,7 @@ function getWeekRanges(
 
 export default function WeeklySummaryPanel({
   trades,
+  layout = 'vertical',
 }: WeeklySummaryPanelProps) {
   const { colors } = useTheme();
   const toDate = (value: any): Date | null => {
@@ -161,7 +163,7 @@ export default function WeeklySummaryPanel({
       </View>
 
       {/* Weekly Boxes */}
-      <View style={styles.weeksContainer}>
+      <View style={[styles.weeksContainer, layout === 'horizontal' ? styles.weeksContainerHorizontal : null]}>
         {weeklyStats.map((w) => {
           const isCurrentWeek = now >= w.range.start && now <= w.range.end;
           const isEmpty = w.trades === 0;
@@ -171,6 +173,7 @@ export default function WeeklySummaryPanel({
               key={w.week}
               style={[
                 styles.weekBox,
+                layout === 'horizontal' ? styles.weekBoxHorizontal : null,
                 {
                   backgroundColor: isEmpty 
                     ? colors.neutral 
@@ -353,9 +356,18 @@ const styles = StyleSheet.create({
   weeksContainer: {
     gap: 12,
   },
+  weeksContainerHorizontal: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
   weekBox: {
     borderRadius: 10,
     padding: 14,
+  },
+  weekBoxHorizontal: {
+    minWidth: 220,
+    marginRight: 12,
+    flexShrink: 0,
   },
   weekHeader: {
     flexDirection: 'row',

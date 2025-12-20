@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -13,6 +13,8 @@ import { useAppContext } from '../hooks/useAppContext';
 
 export default function JournalScreen({ navigation }: any) {
   const { state } = useAppContext();
+  const [showFab, setShowFab] = useState(true);
+  const scrollRef = useRef<any>(null);
   const [filterPair, setFilterPair] = useState('');
   const [filterResult, setFilterResult] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'grade' | 'rr'>('date');
@@ -140,7 +142,13 @@ export default function JournalScreen({ navigation }: any) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} style={styles.container} showsVerticalScrollIndicator={false} onScroll={(e) => {
+      try {
+        const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+        const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+        setShowFab(!(distanceFromBottom <= 120));
+      } catch (err) {}
+    }} scrollEventThrottle={16}>
       {/* Header with Stats */}
       <View style={styles.header}>
         <Text style={styles.title}>Trade Journal</Text>
@@ -269,6 +277,16 @@ export default function JournalScreen({ navigation }: any) {
           scrollEnabled={false}
         />
       )}
+
+      {/* Floating Add Trade button for Journal */}
+      {showFab && (
+        <TouchableOpacity
+          style={styles.journalFab}
+          onPress={() => navigation.navigate('Dashboard', { screen: 'AddTrade' })}
+        >
+          <Text style={styles.journalFabIcon}>＋</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -282,6 +300,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
+  },
+  journalFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#00d4d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+  },
+  journalFabIcon: {
+    fontSize: 26,
+    color: '#0d0d0d',
+    fontWeight: '800',
   },
   title: {
     color: '#f5f5f5',

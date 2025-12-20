@@ -25,7 +25,7 @@ import {
   calculateAverageRR,
 } from "../utils/calculations";
 import { Trade, TradeDirection, TradeSession, Strategy } from "../types";
-import { getUserStrategies, addTrade, getUserAccounts, createAccount, updateAccount, deleteAccount } from "../services/firebaseService";
+import { getUserStrategies, addTrade, getUserAccounts } from "../services/firebaseService";
 import { useAppContext } from "../hooks/useAppContext";
 import AccountModal from "../components/AccountModal";
 
@@ -107,7 +107,6 @@ export default function AddTradeScreen({
   const [riskAmount, setRiskAmount] = useState(""); // Add riskAmount state variable
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [accountModalVisible, setAccountModalVisible] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<any | null>(null);
   const [accountBalance, setAccountBalance] = useState<number>(0);
   const [riskPercentage, setRiskPercentage] = useState<number>(2);
   const [positionSize, setPositionSize] = useState<number | null>(null);
@@ -182,6 +181,16 @@ export default function AddTradeScreen({
       // noop fallback
     }
   };
+
+  // Debug: log modal visibility flags so we can confirm overlays aren't unintentionally blocking scroll
+  useEffect(() => {
+    try {
+      // Use console.warn so devtools show this prominently during debugging
+      console.warn('AddTradeScreen modal flags -> accountModalVisible:', accountModalVisible, 'showConfirmation:', showConfirmation);
+    } catch (e) {
+      // ignore
+    }
+  }, [accountModalVisible, showConfirmation]);
 
   // Initialize selected account from context if available
   useEffect(() => {
@@ -261,13 +270,6 @@ export default function AddTradeScreen({
     }
   }, [selectedChecklist, checklistItems]);
 
-  // Account modal and management handlers
-  const openAccountModal = () => setAccountModalVisible(true);
-  const closeAccountModal = () => {
-    setAccountModalVisible(false);
-    setEditingAccount(null);
-  };
-
   const refreshAccounts = async () => {
     try {
       const userId = state.user?.uid;
@@ -276,36 +278,6 @@ export default function AddTradeScreen({
       dispatch({ type: 'SET_ACCOUNTS', payload: accounts });
     } catch (err) {
       console.error('Failed to refresh accounts', err);
-    }
-  };
-
-  const handleCreateAccount = async (name: string, startingBalance: number) => {
-    try {
-      const userId = state.user?.uid;
-      if (!userId) throw new Error('Not authenticated');
-      await createAccount(userId, name, startingBalance);
-      await refreshAccounts();
-    } catch (err) {
-      console.error('Create account failed', err);
-    }
-  };
-
-  const handleUpdateAccount = async (accountId: string, updates: Partial<any>) => {
-    try {
-      await updateAccount(accountId, updates as any);
-      await refreshAccounts();
-    } catch (err) {
-      console.error('Update account failed', err);
-    }
-  };
-
-  const handleDeleteAccount = async (accountId: string) => {
-    try {
-      await deleteAccount(accountId);
-      await refreshAccounts();
-      if (selectedAccountId === accountId) setSelectedAccountId("");
-    } catch (err) {
-      console.error('Delete account failed', err);
     }
   };
 
@@ -424,7 +396,13 @@ export default function AddTradeScreen({
         screenshots: uploadedScreenshots.filter(Boolean),
       } as Omit<Trade, "id">;
 
-      await addTrade(userId, toSave);
+      const newId = await addTrade(userId, toSave);
+      // Add to local context for immediate UI reflection
+      try {
+        dispatch({ type: 'ADD_TRADE', payload: { ...(toSave as any), id: newId, createdAt: new Date(), updatedAt: new Date() } });
+      } catch (e) {
+        // ignore if dispatch isn't available for some reason
+      }
       setShowConfirmation(false);
       setPendingTrade(null);
       navigation.goBack();
@@ -485,13 +463,24 @@ export default function AddTradeScreen({
             </Text>
           </View>
         </View>
+        <View style={{ marginTop: 12 }}>
+          <Text style={styles.inputLabel}>Custom Pair (e.g., EURGBP)</Text>
+          <TextInput
+            style={[styles.priceInput, { marginTop: 8 }]}
+            placeholder="Enter custom pair"
+            placeholderTextColor="#666"
+            value={pair}
+            onChangeText={(t) => setPair(t.toUpperCase())}
+            autoCapitalize="characters"
+          />
+        </View>
       </View>
 
       {/* Account Selection */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Trading Account</Text>
-          <TouchableOpacity onPress={openAccountModal}>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings', { screen: 'Accounts' })}>
             <Text style={{ color: '#00d4d4', fontWeight: '700' }}>Manage Accounts</Text>
           </TouchableOpacity>
         </View>
@@ -514,7 +503,7 @@ export default function AddTradeScreen({
               </TouchableOpacity>
             ))
           ) : (
-            <TouchableOpacity style={styles.gridButton} onPress={openAccountModal}>
+            <TouchableOpacity style={styles.gridButton} onPress={() => navigation.navigate('Settings', { screen: 'Accounts' })}>
               <Text style={styles.gridButtonText}>Create Account</Text>
             </TouchableOpacity>
           )}
@@ -1029,28 +1018,11 @@ export default function AddTradeScreen({
         <Text style={styles.submitButtonText}>Record Trade</Text>
       </TouchableOpacity>
 
-      <AccountModal
-        visible={accountModalVisible}
-        accounts={state.accounts || []}
-        selectedAccountId={selectedAccountId}
-        onSelect={(id) => {
-          handleSelectAccount(id);
-          closeAccountModal();
-        }}
-        onAddAccount={() => {
-          setEditingAccount(null);
-          setAccountModalVisible(true);
-        }}
-        onClose={closeAccountModal}
-        onCreateAccount={handleCreateAccount}
-        onUpdateAccount={handleUpdateAccount}
-        onDeleteAccount={handleDeleteAccount}
-        editingAccount={editingAccount}
-      />
+      {/* Account management moved to Settings -> Accounts */}
 
       {/* Confirmation Modal */}
       <Modal visible={showConfirmation} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+        <View pointerEvents="box-none" style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
           <View style={{ backgroundColor: '#0d0d0d', borderRadius: 12, padding: 16 }}>
             <Text style={{ color: '#f5f5f5', fontSize: 18, fontWeight: '800', marginBottom: 8 }}>Confirm Trade</Text>
             {pendingTrade && (

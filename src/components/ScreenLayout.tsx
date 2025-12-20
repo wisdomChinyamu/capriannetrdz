@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, SafeAreaView, StyleSheet, Platform, ScrollView } from 'react-native';
+import { View, SafeAreaView, StyleSheet, Platform, ScrollView, Image, Dimensions } from 'react-native';
 import { useTheme } from './ThemeProvider';
 
 interface ScreenLayoutProps {
@@ -18,6 +18,11 @@ export default function ScreenLayout({
   showGradient = false,
 }: ScreenLayoutProps) {
   const { colors } = useTheme();
+  const { width } = Dimensions.get('window');
+  const isMobile = width < 768;
+  const bgImage = isMobile
+    ? require('../../assets/images/bg-img-mobile.png')
+    : require('../../assets/images/bg-img-desktop.png');
 
   // Gradient overlay for cinematic effect
   const GradientOverlay = () =>
@@ -60,7 +65,9 @@ export default function ScreenLayout({
   // On web, SafeAreaView is a no-op but adds unnecessary wrapper
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.safe, { backgroundColor: colors.background }]}>
+      <View style={[styles.safe, { backgroundColor: colors.background }]}
+        >
+        <Image source={bgImage} style={styles.backgroundImage} />
         <GradientOverlay />
         {innerContent}
       </View>
@@ -68,7 +75,8 @@ export default function ScreenLayout({
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}> 
+      <Image source={bgImage} style={styles.backgroundImage} />
       <GradientOverlay />
       {innerContent}
     </SafeAreaView>
@@ -106,5 +114,17 @@ const styles = StyleSheet.create({
     height: 200,
     opacity: 0.3,
     zIndex: 0,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+    zIndex: -1,
+    overflow: 'hidden',
   },
 });

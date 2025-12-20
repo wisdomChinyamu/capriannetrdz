@@ -5,6 +5,7 @@ export interface TradingAccount {
   name: string;
   startingBalance: number;
   currentBalance: number;
+  type?: 'demo' | 'live';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -100,7 +101,7 @@ export interface RoutineItem {
   description?: string;
   category: 'Critical' | 'Important' | 'Optional';
   completed: boolean;
-  completedAt?: Date;
+  completedAt?: Date | null;
 }
 
 export interface Routine {

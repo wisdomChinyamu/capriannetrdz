@@ -88,7 +88,7 @@ export default function AccountDetailsPanel({
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Type</Text>
-            <Text style={styles.statValue}>Demo</Text>
+            <Text style={styles.statValue}>{account.type ? (account.type === 'demo' ? 'Demo' : 'Live') : 'Demo'}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>

@@ -10,6 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { useAppContext } from "../hooks/useAppContext";
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from "../components/ThemeProvider";
 import EditableChecklistTable from "../components/EditableChecklistTable";
 import { ChecklistItem, Strategy } from "../types";
@@ -23,6 +24,7 @@ import {
 export default function SettingsScreen() {
   const { colors, mode, setMode } = useTheme();
   const { state: appContextState, dispatch } = useAppContext();
+  const navigation = useNavigation();
   const userId = appContextState.user?.uid || "current-user"; // Replace with actual user ID from context/auth
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(
@@ -360,19 +362,14 @@ export default function SettingsScreen() {
             styles.settingItem,
             { backgroundColor: colors.surface, borderColor: `${colors.highlight}30` },
           ]}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
+          onPress={() => (navigation as any).navigate('Accounts')}
         >
           <View style={styles.settingLeft}>
-            <Text style={[styles.settingIcon, { color: colors.highlight }]}>
-              🔐
-            </Text>
+            <Text style={[styles.settingIcon, { color: colors.highlight }]}>🏦</Text>
             <View>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>
-                Manage Firebase Account
-              </Text>
-              <Text style={[styles.settingHint, { color: colors.subtext }]}>
-                Security & authentication
-              </Text>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Manage Accounts</Text>
+              <Text style={[styles.settingHint, { color: colors.subtext }]}>Create and edit trading accounts</Text>
             </View>
           </View>
           <Text style={[styles.chevron, { color: colors.subtext }]}>›</Text>

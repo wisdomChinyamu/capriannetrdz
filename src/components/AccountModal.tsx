@@ -19,7 +19,7 @@ interface AccountModalProps {
   onSelect: (id: string) => void;
   onAddAccount: () => void;
   onClose: () => void;
-  onCreateAccount: (name: string, startingBalance: number) => Promise<void>;
+  onCreateAccount: (name: string, startingBalance: number, type?: 'demo' | 'live') => Promise<void>;
   onUpdateAccount?: (accountId: string, updates: Partial<TradingAccount>) => Promise<void>;
   onDeleteAccount?: (accountId: string) => Promise<void>;
   editingAccount?: TradingAccount | null;
@@ -78,11 +78,11 @@ export default function AccountModal({
     onClose();
   };
 
-  const handleSaveAccount = async (name: string, startingBalance: number) => {
+  const handleSaveAccount = async (name: string, startingBalance: number, type?: 'demo'|'live') => {
     if (mode === 'create') {
-      await onCreateAccount(name, startingBalance);
+      await onCreateAccount(name, startingBalance, type);
     } else if (mode === 'edit' && editingAccount && onUpdateAccount) {
-      await onUpdateAccount(editingAccount.id, { name, startingBalance });
+      await onUpdateAccount(editingAccount.id, { name, startingBalance, type });
     }
     handleClose();
   };

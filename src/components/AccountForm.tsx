@@ -14,7 +14,7 @@ import { TradingAccount } from "../types";
 
 interface AccountFormProps {
   account?: TradingAccount | null;
-  onSave: (name: string, startingBalance: number) => Promise<void>;
+  onSave: (name: string, startingBalance: number, type?: 'demo' | 'live') => Promise<void>;
   onCancel: () => void;
   onDelete?: (accountId: string) => Promise<void>;
 }
@@ -29,6 +29,7 @@ export default function AccountForm({
   const [startingBalance, setStartingBalance] = useState(
     account?.startingBalance.toString() || ""
   );
+  const [accountType, setAccountType] = useState<'demo'|'live'>(account?.type || 'demo');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function AccountForm({
 
     setIsLoading(true);
     try {
-      await onSave(name, balance);
+      await onSave(name, balance, accountType);
     } catch (error) {
       console.error("Error saving account:", error);
       Alert.alert(
@@ -116,6 +117,20 @@ export default function AccountForm({
         </View>
 
         <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Account Type</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {['demo','live'].map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.typeButton, accountType === t && styles.typeButtonActive]}
+                  onPress={() => setAccountType(t as 'demo'|'live')}
+                >
+                  <Text style={[styles.typeButtonText, accountType === t && styles.typeButtonTextActive]}>{t === 'demo' ? 'Demo' : 'Live'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Account Name</Text>
             <TextInput
@@ -216,6 +231,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     borderWidth: 1,
     borderColor: "#333",
+  },
+  typeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
+  },
+  typeButtonActive: {
+    backgroundColor: '#00d4d4',
+  },
+  typeButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  typeButtonTextActive: {
+    color: '#000',
   },
   actions: {
     flexDirection: "row",

@@ -14,6 +14,7 @@ import JournalScreen from '../screens/JournalScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
 import RoutineScreen from '../screens/RoutineScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import AccountsScreen from '../screens/AccountsScreen';
 import TradeDetailScreen from '../screens/TradeDetailScreen';
 import AddTradeScreen from '../screens/AddTradeScreen';
 
@@ -205,6 +206,13 @@ function SettingsStack() {
               </View>
             </View>
           ),
+        }}
+      />
+      <Stack.Screen
+        name="Accounts"
+        component={AccountsScreen}
+        options={{
+          title: 'Accounts',
         }}
       />
     </Stack.Navigator>

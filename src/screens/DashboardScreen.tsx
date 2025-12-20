@@ -20,6 +20,7 @@ import TradeCard from "../components/TradeCard";
 import { calculateWinLossRatio, calculatePnL } from "../utils/chartingUtils";
 import ScreenLayout from "../components/ScreenLayout";
 import { useTheme } from "../components/ThemeProvider";
+import { useNavigation } from '@react-navigation/native';
 import EquityChart from "../components/EquityChart";
 import WeeklySummaryPanel from "../components/WeeklySummaryPanel";
 import {
@@ -57,8 +58,11 @@ interface AddTradeScreenProps {
 export default function DashboardScreen() {
   const { state, dispatch } = useAppContext();
   const [showAddTrade, setShowAddTrade] = useState(false);
+  const [showFab, setShowFab] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const { colors, mode } = useTheme();
+  const navigation = useNavigation();
+  const scrollRef = useRef<any>(null);
 
   
 
@@ -99,9 +103,20 @@ export default function DashboardScreen() {
 
   const isWeb = Platform.OS === "web";
   
+  const handleScroll = (e: any) => {
+    try {
+      const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+      const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      // Hide FAB when within 140px of bottom (where main Add Trade lives)
+      setShowFab(!(distanceFromBottom <= 140));
+    } catch (err) {
+      // ignore
+    }
+  };
+
   return (
     <ScreenLayout style={{ backgroundColor: colors.background }}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16}>
         {/* Enhanced Header with Gradient Accent */}
         <View style={styles.header}>
           <View style={styles.headerGradient}>
@@ -272,7 +287,9 @@ export default function DashboardScreen() {
 
         {!isWeb && (
           <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
-            <WeeklySummaryPanel trades={trades} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <WeeklySummaryPanel trades={trades} layout="horizontal" />
+            </ScrollView>
           </View>
         )}
 
@@ -280,21 +297,30 @@ export default function DashboardScreen() {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.primaryButton]}
-            onPress={() => setShowAddTrade(true)}
+            onPress={() => (navigation as any).navigate('AddTrade')}
           >
             <Text style={styles.actionButtonIcon}>+</Text>
             <Text style={styles.actionButtonText}>Add Trade</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
+          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={() => (navigation as any).navigate('Journal')}>
             <Text style={styles.actionButtonIcon}>📝</Text>
-            <Text style={[styles.actionButtonText, { color: colors.text }]}>
-              Open Journal
-            </Text>
+            <Text style={[styles.actionButtonText, { color: colors.text }]}>Open Journal</Text>
           </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Floating Add Trade Button (mobile) */}
+      {!isWeb && showFab && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => (navigation as any).navigate('AddTrade')}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.fabIcon}>＋</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={showAddTrade}
@@ -347,6 +373,8 @@ export default function DashboardScreen() {
     </ScreenLayout>
   );
 }
+
+// Floating Add Trade button styles at the bottom-right
 
 function AddTradeModalAnimated({ visible, onClose, onSubmit }: any) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -807,5 +835,27 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 15,
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 90,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#00d4d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    zIndex: 40,
+  },
+  fabIcon: {
+    fontSize: 28,
+    color: '#0d0d0d',
+    fontWeight: '800',
   },
 });

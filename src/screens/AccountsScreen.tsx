@@ -12,13 +12,13 @@ const AccountsScreen = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TradingAccount | null>(null);
 
-  const handleCreateAccount = async (name: string, startingBalance: number) => {
+  const handleCreateAccount = async (name: string, startingBalance: number, type: 'demo'|'live' = 'demo') => {
     try {
       if (!state.user?.uid) {
         throw new Error('User not authenticated');
       }
 
-      const accountId = await createAccount(state.user.uid, name, startingBalance);
+      const accountId = await createAccount(state.user.uid, name, startingBalance, type);
       
       // Refresh accounts list
       const updatedAccounts = await getUserAccounts(state.user.uid);
