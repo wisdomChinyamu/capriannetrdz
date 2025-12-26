@@ -42,6 +42,34 @@ export function calculateRiskToReward(
 }
 
 /**
+ * Calculate an effective R:R that prefers an actual exit when provided.
+ * If `actualExit` is provided and valid, R:R = abs(actualExit - entry) / abs(entry - stopLoss)
+ * Falls back to the planned TP-based R:R using `calculateRiskToReward`.
+ */
+export function calculateEffectiveRR(
+  entry: number,
+  stopLoss: number,
+  takeProfit: number,
+  direction: TradeDirection,
+  actualExit?: number | null
+): number {
+  try {
+    if (actualExit !== undefined && actualExit !== null && !isNaN(Number(actualExit))) {
+      const exit = Number(actualExit);
+      const stopDistance = Math.abs(entry - stopLoss);
+      if (stopDistance > 0) {
+        const exitDistance = Math.abs(exit - entry);
+        return exitDistance / stopDistance;
+      }
+    }
+
+    return calculateRiskToReward(entry, stopLoss, takeProfit, direction);
+  } catch (e) {
+    return calculateRiskToReward(entry, stopLoss, takeProfit, direction);
+  }
+}
+
+/**
  * Calculate confluence score based on checklist items selected
  * Score = (sum of weights of selected items) / (sum of all weights) * 100
  */

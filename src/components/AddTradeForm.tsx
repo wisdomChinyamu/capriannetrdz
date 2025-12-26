@@ -56,6 +56,7 @@ export default function AddTradeForm({
   const [entryPrice, setEntryPrice] = React.useState('');
   const [stopLoss, setStopLoss] = React.useState('');
   const [takeProfit, setTakeProfit] = React.useState('');
+  const [actualExit, setActualExit] = React.useState('');
   const [riskAmount, setRiskAmount] = React.useState('');
   const [result, setResult] = React.useState<'Win' | 'Loss' | 'Break-even' | undefined>();
   const [emotionalRating, setEmotionalRating] = React.useState(5);
@@ -67,18 +68,30 @@ export default function AddTradeForm({
 
   const calculateRR = () => {
     if (!entryPrice || !stopLoss || !takeProfit) return 0;
-    
+
     const entry = parseFloat(entryPrice);
     const sl = parseFloat(stopLoss);
     const tp = parseFloat(takeProfit);
-    
+
     // Validate numeric inputs
     if (isNaN(entry) || isNaN(sl) || isNaN(tp)) return 0;
-    
+
+    // Prefer actualExit when provided
+    if (actualExit) {
+      const ax = parseFloat(actualExit);
+      if (!isNaN(ax)) {
+        const stopDistance = Math.abs(entry - sl);
+        if (stopDistance > 0) {
+          const exitDistance = Math.abs(ax - entry);
+          return Number((exitDistance / stopDistance).toFixed(2));
+        }
+      }
+    }
+
     // Calculate risk and reward
     const risk = Math.abs(entry - sl);
     const reward = Math.abs(tp - entry);
-    
+
     // Avoid division by zero
     return risk > 0 ? Number((reward / risk).toFixed(2)) : 0;
   };
@@ -144,6 +157,7 @@ export default function AddTradeForm({
         ...(selectedChecklistItems.length > 0 && { checklist: selectedChecklistItems }),
         ...(riskAmountNum !== undefined && { riskAmount: riskAmountNum }),
         ...(selectedAccountId && { accountId: selectedAccountId }),
+        ...(actualExit !== '' && { actualExit: parseFloat(actualExit) }),
       };
 
       await onSubmit(tradeData);
@@ -385,6 +399,25 @@ export default function AddTradeForm({
                     // Allow only numeric input with decimal point
                     if (text === '' || /^\d*\.?\d*$/.test(text)) {
                       setTakeProfit(text);
+                    }
+                  }}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.priceRow}>
+              <Text style={styles.priceIcon}>✓</Text>
+              <View style={styles.priceInputGroup}>
+                <Text style={[styles.priceLabel, { color: colors.subtext }]}>Actual Exit (optional)</Text>
+                <TextInput
+                  style={[styles.priceInput, { backgroundColor: colors.neutral, color: colors.text }]}
+                  placeholder="0.00000"
+                  placeholderTextColor={colors.subtext}
+                  value={actualExit}
+                  onChangeText={(text) => {
+                    if (text === '' || /^\d*\.?\d*$/.test(text)) {
+                      setActualExit(text);
                     }
                   }}
                   keyboardType="decimal-pad"

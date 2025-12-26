@@ -9,11 +9,14 @@ import {
   FlatList,
   Platform,
   Modal,
+  Alert,
 } from 'react-native';
+import { deleteTrade as deleteTradeService, updateAccount, getUserAccounts } from '../services/firebaseService';
+import { deleteTradeImage } from '../services/supabaseImageService';
 import { useAppContext } from '../hooks/useAppContext';
 
 export default function JournalScreen({ navigation }: any) {
-  const { state } = useAppContext();
+  const { state, dispatch } = useAppContext();
   const [showFab, setShowFab] = useState(true);
   const scrollRef = useRef<any>(null);
   const [filterPair, setFilterPair] = useState('');
@@ -124,6 +127,84 @@ export default function JournalScreen({ navigation }: any) {
               <Text style={styles.resultText}>{item.result || 'Pending'}</Text>
             </View>
             <Text style={styles.arrowIcon}>→</Text>
+            <TouchableOpacity
+              style={styles.cardDelete}
+              onPress={async () => {
+                Alert.alert('Delete Trade', 'Are you sure you want to delete this trade?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: async () => {
+                    try {
+                      if (!item?.id) throw new Error('Trade id missing');
+
+                      // Best-effort delete images
+                      try {
+                        if (item.screenshots && Array.isArray(item.screenshots)) {
+                          for (const s of item.screenshots) {
+                            const uri = typeof s === 'string' ? s : (s?.uri || s?.url || '');
+                            if (uri) {
+                              try { await deleteTradeImage(uri); } catch (e) {}
+                            }
+                          }
+                        }
+                      } catch (e) {}
+
+                      // compute pnl locally (prefer actualExit)
+                      const computePnl = (t: any) => {
+                        try {
+                          if (t?.pnl !== undefined && t?.pnl !== null) return Number(t.pnl) || 0;
+                          const risk = Math.abs(Number(t?.riskAmount) || 0);
+                          const entry = Number(t?.entryPrice);
+                          const sl = Number(t?.stopLoss);
+                          const ax = (t?.actualExit !== undefined && t?.actualExit !== null) ? Number(t.actualExit) : null;
+                          const stopDistance = Math.abs(entry - sl);
+                          if (ax !== null && !isNaN(ax) && stopDistance > 0) {
+                            const exitDistance = Math.abs(ax - entry);
+                            let sign = 0;
+                            if (t.direction === 'Buy') {
+                              sign = ax > entry ? 1 : ax < entry ? -1 : 0;
+                            } else {
+                              sign = ax < entry ? 1 : ax > entry ? -1 : 0;
+                            }
+                            const pnl = sign * (exitDistance / stopDistance) * risk;
+                            return Math.round(pnl * 100) / 100;
+                          }
+                          const rr = Number(t?.riskToReward) || 1;
+                          if (t?.result === 'Win') return Math.round(risk * rr * 100) / 100;
+                          if (t?.result === 'Loss') return Math.round(-risk * 100) / 100;
+                          return 0;
+                        } catch (e) { return 0; }
+                      };
+
+                      const pnl = computePnl(item);
+
+                      await deleteTradeService(item.id);
+                      try { dispatch && dispatch({ type: 'DELETE_TRADE', payload: item.id }); } catch (e) {}
+
+                      // revert account balance
+                      try {
+                        const accountId = item.accountId;
+                        if (accountId) {
+                          const currentAccounts = await getUserAccounts((state.user && state.user.uid) || '');
+                          const acc = currentAccounts.find(a => a.id === accountId) || (state.accounts && state.accounts.find(a => a.id === accountId));
+                          if (acc) {
+                            const newBalance = Number(acc.currentBalance || 0) - Number(pnl || 0);
+                            await updateAccount(accountId, { currentBalance: newBalance });
+                            const refreshed = await getUserAccounts((state.user && state.user.uid) || '');
+                            try { dispatch && dispatch({ type: 'SET_ACCOUNTS', payload: refreshed }); } catch (e) {}
+                          }
+                        }
+                      } catch (e) {}
+
+                    } catch (err) {
+                      console.error('Failed to delete trade', err);
+                      Alert.alert('Error', 'Failed to delete trade');
+                    }
+                  }}
+                ]);
+              }}
+            >
+              <Text style={styles.deleteIcon}>🗑️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -286,7 +367,8 @@ export default function JournalScreen({ navigation }: any) {
           renderItem={renderTradeCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
         />
       )}
 
@@ -558,6 +640,14 @@ const styles = StyleSheet.create({
     color: '#00d4d4',
     fontSize: 20,
     fontWeight: '700',
+  },
+  cardDelete: {
+    marginTop: 8,
+    padding: 6,
+  },
+  deleteIcon: {
+    fontSize: 18,
+    color: '#f44336',
   },
   emotionBar: {
     flexDirection: 'row',

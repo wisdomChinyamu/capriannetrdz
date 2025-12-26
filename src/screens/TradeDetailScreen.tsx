@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal } from 'react-native';
 import { useAppContext } from '../hooks/useAppContext';
-import { deleteTrade as deleteTradeService } from '../services/firebaseService';
+import { deleteTrade as deleteTradeService, updateAccount, getUserAccounts } from '../services/firebaseService';
+import { calculateEffectiveRR } from '../utils/calculations';
+import { deleteTradeImage } from '../services/supabaseImageService';
 
 export default function TradeDetailScreen({ route, navigation }: any) {
   const trade = route?.params?.trade;
@@ -30,6 +32,16 @@ export default function TradeDetailScreen({ route, navigation }: any) {
     if (trade.result === 'Loss') return '#f44336';
     return '#ffa500';
   };
+
+  const displayedRR = (() => {
+    try {
+      if (trade && trade.actualExit !== undefined && trade.actualExit !== null) {
+        const eff = calculateEffectiveRR(Number(trade.entryPrice), Number(trade.stopLoss), Number(trade.takeProfit), trade.direction, Number(trade.actualExit));
+        return Number(eff || trade.riskToReward || 0);
+      }
+    } catch (e) {}
+    return Number(trade.riskToReward || 0);
+  })();
 
   const getGradeColor = (grade: string) => {
     if (grade.startsWith('A')) return '#4caf50';
@@ -79,7 +91,7 @@ export default function TradeDetailScreen({ route, navigation }: any) {
           <View style={styles.heroStatItem}>
             <Text style={styles.heroStatLabel}>Risk:Reward</Text>
             <Text style={[styles.heroStatValue, { color: '#00d4d4' }]}>
-              1:{trade.riskToReward.toFixed(2)}
+              1:{displayedRR.toFixed(2)}
             </Text>
           </View>
           <View style={styles.heroStatDivider} />
@@ -355,7 +367,7 @@ export default function TradeDetailScreen({ route, navigation }: any) {
 
       {/* Action Buttons */}
       <View style={styles.actionSection}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => (navigation as any).navigate('Dashboard', { screen: 'AddTrade', params: { trade } })}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => (navigation as any).navigate('Dashboard', { screen: 'AddTrade', params: { trade, origin: 'Journal' } })}>
           <Text style={styles.actionButtonIcon}>✏️</Text>
           <Text style={styles.actionButtonText}>Edit Trade</Text>
         </TouchableOpacity>
@@ -364,18 +376,97 @@ export default function TradeDetailScreen({ route, navigation }: any) {
           onPress={async () => {
             Alert.alert('Delete Trade', 'Are you sure you want to delete this trade?', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: async () => {
-                try {
-                  if (trade?.id) {
-                    await deleteTradeService(trade.id);
-                    try { dispatch({ type: 'DELETE_TRADE', payload: trade.id }); } catch {}
-                    navigation.goBack();
-                  }
-                } catch (err) {
-                  console.error('Failed to delete trade', err);
-                  Alert.alert('Error', 'Failed to delete trade');
-                }
-              }}
+                      { text: 'Delete', style: 'destructive', onPress: async () => {
+                        try {
+                          console.warn('Attempting to delete trade', trade?.id);
+                          if (!trade?.id) throw new Error('Trade id missing');
+
+                          // Delete any linked screenshots from Supabase (best-effort)
+                          try {
+                            if (trade.screenshots && Array.isArray(trade.screenshots)) {
+                              for (const s of trade.screenshots) {
+                                const uri = typeof s === 'string' ? s : (s?.uri || s?.url || '');
+                                if (uri) {
+                                  try { await deleteTradeImage(uri); } catch (e) { /* best-effort */ }
+                                }
+                              }
+                            }
+                          } catch (e) {
+                            // ignore image deletion errors
+                          }
+
+                          // Compute PnL impact of this trade so we can revert it on the account
+                          const computeTradePnlLocal = (t: any) => {
+                            try {
+                              if (t?.pnl !== undefined && t?.pnl !== null) return Number(t.pnl) || 0;
+                              const risk = Math.abs(Number(t?.riskAmount) || 0);
+                              const entry = Number(t?.entryPrice);
+                              const sl = Number(t?.stopLoss);
+                              const ax = (t?.actualExit !== undefined && t?.actualExit !== null) ? Number(t.actualExit) : null;
+                              const stopDistance = Math.abs(entry - sl);
+                              if (ax !== null && !isNaN(ax) && stopDistance > 0) {
+                                const exitDistance = Math.abs(ax - entry);
+                                let sign = 0;
+                                if (t.direction === 'Buy') {
+                                  sign = ax > entry ? 1 : ax < entry ? -1 : 0;
+                                } else {
+                                  sign = ax < entry ? 1 : ax > entry ? -1 : 0;
+                                }
+                                const pnl = sign * (exitDistance / stopDistance) * risk;
+                                return Math.round(pnl * 100) / 100;
+                              }
+
+                              const rr = Number(t?.riskToReward) || 1;
+                              if (t?.result === 'Win') return Math.round(risk * rr * 100) / 100;
+                              if (t?.result === 'Loss') return Math.round(-risk * 100) / 100;
+                              return 0;
+                            } catch (e) {
+                              return 0;
+                            }
+                          };
+
+                          const pnl = computeTradePnlLocal(trade);
+
+                          // Delete Firestore trade doc
+                          await deleteTradeService(trade.id);
+
+                          // Update local context
+                          try { dispatch({ type: 'DELETE_TRADE', payload: trade.id }); console.warn('Dispatched DELETE_TRADE', trade.id); } catch (e) { console.warn('Dispatch failed', e); }
+
+                          // If linked to an account, revert the PnL impact
+                          try {
+                            const accountId = trade.accountId;
+                            if (accountId) {
+                              const currentAccounts = await getUserAccounts((state.user && state.user.uid) || '');
+                              const acc = currentAccounts.find(a => a.id === accountId) || (state.accounts && state.accounts.find(a => a.id === accountId));
+                              if (acc) {
+                                const newBalance = Number(acc.currentBalance || 0) - Number(pnl || 0);
+                                await updateAccount(accountId, { currentBalance: newBalance });
+                                const refreshed = await getUserAccounts((state.user && state.user.uid) || '');
+                                try { dispatch({ type: 'SET_ACCOUNTS', payload: refreshed }); } catch {}
+                              }
+                            }
+                          } catch (e) {
+                            // ignore account update errors
+                          }
+
+                          // Navigate back to journal with fallback
+                          try {
+                            if (navigation && typeof navigation.goBack === 'function' && navigation.canGoBack && navigation.canGoBack()) {
+                              navigation.goBack();
+                            } else if (navigation && typeof navigation.navigate === 'function') {
+                              navigation.navigate('Journal');
+                            }
+                          } catch (e) {
+                            try { navigation.goBack(); } catch {}
+                          }
+
+                          Alert.alert('Deleted', 'Trade deleted successfully');
+                        } catch (err) {
+                          console.error('Failed to delete trade', err);
+                          Alert.alert('Error', 'Failed to delete trade');
+                        }
+                      }}
             ]);
           }}
         >

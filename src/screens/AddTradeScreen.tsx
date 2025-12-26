@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import {
   calculateRiskToReward,
+  calculateEffectiveRR,
   calculateConfluenceScore,
   assignGrade,
   calculateWinRate,
@@ -108,7 +109,7 @@ export default function AddTradeScreen({
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [accountBalance, setAccountBalance] = useState<number>(0);
-  const [riskPercentage, setRiskPercentage] = useState<number>(2);
+  const [riskPercentage, setRiskPercentage] = useState<string>('2');
   const [positionSize, setPositionSize] = useState<number | null>(null);
   const [isResultAutoCalculated, setIsResultAutoCalculated] = useState<boolean>(false);
   const [tradeDate, setTradeDate] = useState<Date>(new Date());
@@ -147,15 +148,16 @@ export default function AddTradeScreen({
 
   useEffect(() => {
     if (entryPrice && stopLoss && takeProfit) {
-      const rrValue = calculateRiskToReward(
+      const effective = calculateEffectiveRR(
         Number(entryPrice),
         Number(stopLoss),
         Number(takeProfit),
-        direction
+        direction,
+        actualExit ? Number(actualExit) : undefined
       );
-      setRR(parseFloat(rrValue.toFixed(2)));
+      setRR(parseFloat(Number(effective || 0).toFixed(2)));
     }
-  }, [entryPrice, stopLoss, takeProfit, direction]);
+  }, [entryPrice, stopLoss, takeProfit, direction, actualExit]);
 
   useEffect(() => {
     // Enable LayoutAnimation on Android
@@ -232,6 +234,21 @@ export default function AddTradeScreen({
         setScreenshots(editingTrade.screenshots || []);
         setSelectedAccountId(editingTrade.accountId || (state.accounts && state.accounts[0]?.id) || '');
         setRiskAmount(editingTrade.riskAmount ? String(editingTrade.riskAmount) : '');
+        // Derive and populate riskPercentage when editing an existing trade
+        try {
+          if (editingTrade.riskPercentage !== undefined && editingTrade.riskPercentage !== null) {
+            setRiskPercentage(String(editingTrade.riskPercentage));
+          } else if (editingTrade.riskAmount) {
+            const account = (state.accounts && state.accounts.find((a) => a.id === editingTrade.accountId)) || (state.accounts && state.accounts[0]);
+            const base = account ? Number(account.currentBalance || account.startingBalance || 0) : 0;
+            if (base > 0) {
+              const pct = (Number(editingTrade.riskAmount) / base) * 100;
+              if (!isNaN(pct) && isFinite(pct)) setRiskPercentage(String(parseFloat(pct.toFixed(3))));
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
         const parsed = parseDate(editingTrade.tradeTime) || parseDate(editingTrade.createdAt) || new Date();
         setTradeDate(parsed);
         if (parsed) {
@@ -265,12 +282,19 @@ export default function AddTradeScreen({
         if (ax <= sl) return "Loss";
         if (ax >= tp) return "Win";
         if (ax === e) return "Break-even";
+        // If exit is between entry and TP -> treat as a partial win
+        if (ax > e && ax < tp) return "Win";
+        // If exit is between SL and entry -> treat as a partial loss
+        if (ax < e && ax > sl) return "Loss";
         return "";
       } else {
         // Sell
         if (ax >= sl) return "Loss";
         if (ax <= tp) return "Win";
         if (ax === e) return "Break-even";
+        // For sell, profit if actual exit < entry
+        if (ax < e && ax > tp) return "Win";
+        if (ax > e && ax < sl) return "Loss";
         return "";
       }
     };
@@ -293,13 +317,46 @@ export default function AddTradeScreen({
     if (stopDistance === 0) return;
 
     // Risk amount based on percentage of account balance
-    const calculatedRiskAmount = accountBalance * (riskPercentage / 100);
+    const rp = parseFloat(riskPercentage || '0');
+    const calculatedRiskAmount = accountBalance * (rp / 100);
     // Position size (units) = RiskAmount / StopDistance (price units)
     const calculatedPositionSize = calculatedRiskAmount / stopDistance;
 
     setPositionSize(parseFloat(calculatedPositionSize.toFixed(4)));
     setRiskAmount(String(parseFloat(calculatedRiskAmount.toFixed(2))));
   }, [selectedAccountId, accountBalance, entryPrice, stopLoss, riskPercentage]);
+
+  // Compute monetary PnL for a trade, prioritizing actualExit when available
+  const computeTradePnl = (t: any) => {
+    try {
+      if (t?.pnl !== undefined && t?.pnl !== null) return Number(t.pnl) || 0;
+      const risk = Math.abs(Number(t?.riskAmount) || 0);
+      const entry = Number(t?.entryPrice);
+      const sl = Number(t?.stopLoss);
+      const ax = t?.actualExit !== undefined && t?.actualExit !== null ? Number(t.actualExit) : null;
+
+      const stopDistance = Math.abs(entry - sl);
+      if (ax !== null && !isNaN(ax) && stopDistance > 0) {
+        const exitDistance = Math.abs(ax - entry);
+        let sign = 0;
+        if (t.direction === 'Buy') {
+          sign = ax > entry ? 1 : ax < entry ? -1 : 0;
+        } else {
+          sign = ax < entry ? 1 : ax > entry ? -1 : 0;
+        }
+        const pnl = sign * (exitDistance / stopDistance) * risk;
+        return Math.round(pnl * 100) / 100;
+      }
+
+      // Fallback to result-based calculation
+      const rr = Number(t?.riskToReward) || 1;
+      if (t?.result === 'Win') return Math.round(risk * rr * 100) / 100;
+      if (t?.result === 'Loss') return Math.round(-risk * 100) / 100;
+      return 0;
+    } catch (e) {
+      return 0;
+    }
+  };
 
   useEffect(() => {
     if (selectedChecklist.length > 0 && checklistItems.length > 0) {
@@ -391,6 +448,14 @@ export default function AddTradeScreen({
       // keep default tradeDate if parsing fails
     }
 
+    const effectiveRR = calculateEffectiveRR(
+      Number(entryPrice),
+      Number(stopLoss),
+      Number(takeProfit),
+      direction,
+      actualExit ? Number(actualExit) : undefined
+    );
+
     const previewTrade: any = {
       pair: pair as any,
       direction,
@@ -401,7 +466,7 @@ export default function AddTradeScreen({
       takeProfit: Number(takeProfit),
       actualExit: actualExit ? Number(actualExit) : undefined,
       result: (result as any) || undefined,
-      riskToReward: rr,
+      riskToReward: parseFloat(Number(effectiveRR || rr || 0).toFixed(2)),
       confluenceScore: confluenceScore || 0,
       grade: confluenceScore ? assignGrade(confluenceScore) : "D",
       strategyId: selectedStrategyId || undefined,
@@ -460,8 +525,8 @@ export default function AddTradeScreen({
               return 0;
             };
 
-            const oldPnl = calcPnl(editingTrade);
-            const newPnl = calcPnl(toSave as any);
+            const oldPnl = computeTradePnl(editingTrade);
+            const newPnl = computeTradePnl(toSave as any);
             const delta = newPnl - oldPnl;
 
             if (delta !== 0) {
@@ -481,7 +546,17 @@ export default function AddTradeScreen({
 
         setShowConfirmation(false);
         setPendingTrade(null);
-        navigation.goBack();
+        const updatedTrade = { ...(editingTrade as any), ...(toSave as any), id: editingTrade.id };
+        try { dispatch({ type: 'UPDATE_TRADE', payload: updatedTrade }); } catch {}
+        if (route?.params?.origin === 'Journal') {
+          try {
+            (navigation as any).navigate('Journal', { screen: 'TradeDetail', params: { trade: updatedTrade } });
+          } catch (e) {
+            navigation.goBack();
+          }
+        } else {
+          navigation.goBack();
+        }
         Alert.alert('Success', 'Trade updated');
       } else {
         const newId = await addTrade(userId, toSave);
@@ -493,14 +568,7 @@ export default function AddTradeScreen({
         try {
           const accountId = (toSave as any).accountId;
           if (accountId) {
-            const tradePnl = (() => {
-              if ((toSave as any).pnl !== undefined && (toSave as any).pnl !== null) return Number((toSave as any).pnl) || 0;
-              const risk = Math.abs(Number((toSave as any).riskAmount) || 0);
-              const rr = Number((toSave as any).riskToReward) || 1;
-              if ((toSave as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
-              if ((toSave as any).result === 'Loss') return Math.round(-risk * 100) / 100;
-              return 0;
-            })();
+            const tradePnl = computeTradePnl(toSave as any);
 
             const currentAccounts = await getUserAccounts(userId);
             const acc = currentAccounts.find(a => a.id === accountId);
@@ -517,7 +585,11 @@ export default function AddTradeScreen({
 
         setShowConfirmation(false);
         setPendingTrade(null);
-        navigation.goBack();
+        if (route?.params?.origin === 'Journal') {
+          try { (navigation as any).navigate('Journal'); } catch { navigation.goBack(); }
+        } else {
+          navigation.goBack();
+        }
         Alert.alert("Success", `Trade recorded: ${pair} ${direction}`);
       }
     } catch (err) {
@@ -867,8 +939,55 @@ export default function AddTradeScreen({
               <View style={styles.inputWithIcon}>
                 <TextInput
                   style={styles.priceInput}
-                  value={String(riskPercentage)}
-                  onChangeText={(t) => setRiskPercentage(Number(t) || 0)}
+                  value={riskPercentage}
+                  onChangeText={(t) => {
+                    // Allow up to 3 integer digits and up to 3 decimal places, clamp 0-100.
+                    // Preserve an in-progress trailing dot so the user can type decimals (e.g., "34.").
+                    const cleaned = t.replace(/[^0-9.]/g, '');
+                    // Collapse multiple dots but remember if the user ended with a dot
+                    const endsWithDot = cleaned.endsWith('.');
+                    const parts = cleaned.split('.').filter(Boolean);
+                    const intPartRaw = parts[0] || '';
+                    const intPart = intPartRaw.slice(0, 3);
+                    let decPart = '';
+                    if (cleaned.includes('.')) {
+                      // Get the substring after the FIRST dot in the original cleaned input
+                      const firstDotIndex = cleaned.indexOf('.');
+                      decPart = cleaned.slice(firstDotIndex + 1).replace(/\./g, '').slice(0, 3);
+                    }
+
+                    // Build display value, preserving a trailing dot if present
+                    let display = intPart;
+                    if (cleaned.includes('.') && (decPart.length > 0 || endsWithDot)) {
+                      display = display + '.' + decPart;
+                      if (endsWithDot && decPart.length === 0) display = display + '';// keep the trailing dot visually by not stripping
+                    }
+
+                    // If user cleared input, allow empty string
+                    if (display === '') {
+                      setRiskPercentage('');
+                      return;
+                    }
+
+                    // Clamp numeric value to 0-100, but preserve the user's decimal precision where reasonable
+                    const asNum = parseFloat(display);
+                    if (isNaN(asNum)) {
+                      setRiskPercentage('');
+                      return;
+                    }
+                    const clamped = Math.min(100, Math.max(0, asNum));
+
+                    // If user typed a trailing dot, keep it (as "34.") so they can continue typing decimals.
+                    if (endsWithDot && cleaned.indexOf('.') === cleaned.length - 1) {
+                      setRiskPercentage(String(Math.floor(clamped)) + '.');
+                      return;
+                    }
+
+                    // Otherwise format preserving up to 3 decimals
+                    const decimals = (decPart && decPart.length) || 0;
+                    const formatted = decimals > 0 ? clamped.toFixed(Math.min(3, decimals)) : String(Math.floor(clamped));
+                    setRiskPercentage(formatted);
+                  }}
                   keyboardType="decimal-pad"
                 />
                 <Text style={{ color: '#aaa', fontWeight: '700' }}>%</Text>

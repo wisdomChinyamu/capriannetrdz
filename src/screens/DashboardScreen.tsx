@@ -385,14 +385,34 @@ export default function DashboardScreen() {
               try {
                 const accountId = trade.accountId;
                 if (accountId) {
-                  const tradePnl = (() => {
-                    if ((trade as any).pnl !== undefined && (trade as any).pnl !== null) return Number((trade as any).pnl) || 0;
-                    const risk = Math.abs(Number((trade as any).riskAmount) || 0);
-                    const rr = Number((trade as any).riskToReward) || 1;
-                    if ((trade as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
-                    if ((trade as any).result === 'Loss') return Math.round(-risk * 100) / 100;
-                    return 0;
-                  })();
+                  const computeTradePnlLocal = (t: any) => {
+                    try {
+                      if (t?.pnl !== undefined && t?.pnl !== null) return Number(t.pnl) || 0;
+                      const risk = Math.abs(Number(t?.riskAmount) || 0);
+                      const entry = Number(t?.entryPrice);
+                      const sl = Number(t?.stopLoss);
+                      const ax = t?.actualExit !== undefined && t?.actualExit !== null ? Number(t.actualExit) : null;
+                      const stopDistance = Math.abs(entry - sl);
+                      if (ax !== null && !isNaN(ax) && stopDistance > 0) {
+                        const exitDistance = Math.abs(ax - entry);
+                        let sign = 0;
+                        if (t.direction === 'Buy') {
+                          sign = ax > entry ? 1 : ax < entry ? -1 : 0;
+                        } else {
+                          sign = ax < entry ? 1 : ax > entry ? -1 : 0;
+                        }
+                        const pnl = sign * (exitDistance / stopDistance) * risk;
+                        return Math.round(pnl * 100) / 100;
+                      }
+                      const rr = Number(t?.riskToReward) || 1;
+                      if (t?.result === 'Win') return Math.round(risk * rr * 100) / 100;
+                      if (t?.result === 'Loss') return Math.round(-risk * 100) / 100;
+                      return 0;
+                    } catch (e) {
+                      return 0;
+                    }
+                  };
+                  const tradePnl = computeTradePnlLocal(trade);
 
                   const currentAccounts = await getUserAccounts(userId);
                   const acc = currentAccounts.find((a: any) => a.id === accountId);
