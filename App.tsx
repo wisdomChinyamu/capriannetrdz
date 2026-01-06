@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { AppProvider } from "./src/context/AppContext";
+import { ToastProvider } from './src/context/ToastContext';
 import AuthNavigator from "./src/screens/AuthNavigator";
 import ThemeProvider from "./src/components/ThemeProvider";
 
@@ -45,12 +46,14 @@ export default function App() {
   return (
     <RootView {...rootProps}>
       <AppProvider>
-        <ThemeProvider initial="dark">
-          <NavigationContainer>
-            {StatusBar && <StatusBar />}
-            <AuthNavigator />
-          </NavigationContainer>
-        </ThemeProvider>
+        <ToastProvider>
+          <ThemeProvider initial="dark">
+            <NavigationContainer>
+              {StatusBar && <StatusBar />}
+              <AuthNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </ToastProvider>
       </AppProvider>
     </RootView>
   );

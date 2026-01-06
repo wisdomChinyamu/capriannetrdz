@@ -1,12 +1,26 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+} from "react-native";
 import { TradingAccount } from "../types";
+import { getAccountTransactions } from "../services/firebaseService";
 
 interface AccountDetailsPanelProps {
   account: TradingAccount;
   onEdit?: () => void;
   onDelete?: () => void;
-  onTransaction?: (accountId: string, newBalance: number) => Promise<void> | void;
+  onTransaction?: (
+    accountId: string,
+    newBalance: number,
+    type: "deposit" | "withdrawal",
+    amount: number
+  ) => Promise<void> | void;
 }
 
 export default function AccountDetailsPanel({
@@ -16,11 +30,17 @@ export default function AccountDetailsPanel({
   onTransaction,
 }: AccountDetailsPanelProps) {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
-  const [amount, setAmount] = useState('');
+  const [transactionType, setTransactionType] = useState<
+    "deposit" | "withdrawal"
+  >("deposit");
+  const [amount, setAmount] = useState("");
+  const [transactions, setTransactions] = useState<any[]>([]);
 
   const balanceChange = account.currentBalance - account.startingBalance;
-  const balanceChangePercentage = ((balanceChange / account.startingBalance) * 100).toFixed(2);
+  const balanceChangePercentage = (
+    (balanceChange / account.startingBalance) *
+    100
+  ).toFixed(2);
   const isProfit = balanceChange >= 0;
 
   const handleTransaction = () => {
@@ -29,26 +49,64 @@ export default function AccountDetailsPanel({
     if (parsed <= 0) {
       // ignore or show error
       setShowTransactionModal(false);
-      setAmount('');
+      setAmount("");
       return;
     }
 
-    const newBalance = transactionType === 'deposit'
-      ? Number(account.currentBalance || 0) + parsed
-      : Number(account.currentBalance || 0) - parsed;
+    const newBalance =
+      transactionType === "deposit"
+        ? Number(account.currentBalance || 0) + parsed
+        : Number(account.currentBalance || 0) - parsed;
 
     if (onTransaction) {
       try {
-        // allow parent to persist and refresh accounts
-        onTransaction(account.id, newBalance);
+        // allow parent to persist and refresh accounts and record transaction
+        const maybePromise = onTransaction(
+          account.id,
+          newBalance,
+          transactionType,
+          parsed
+        );
+        Promise.resolve(maybePromise).then(() => fetchTransactions());
       } catch (err) {
-        console.error('Transaction error', err);
+        console.error("Transaction error", err);
       }
     }
 
     setShowTransactionModal(false);
-    setAmount('');
+    setAmount("");
   };
+
+  const fetchTransactions = async () => {
+    try {
+      const items = await getAccountTransactions(account.id, 10);
+      // Normalize createdAt to Date and ensure id exists
+      const normalized = (items || []).map((it: any) => ({
+        id: it.id || `${Math.random().toString(36).slice(2, 9)}`,
+        ...it,
+        createdAt:
+          it?.createdAt &&
+          typeof it.createdAt === "object" &&
+          typeof it.createdAt.toDate === "function"
+            ? it.createdAt.toDate()
+            : it?.createdAt instanceof Date
+            ? it.createdAt
+            : new Date(it?.createdAt || Date.now()),
+      }));
+      console.debug(
+        "fetched transactions for account",
+        account.id,
+        normalized.length
+      );
+      setTransactions(normalized);
+    } catch (err) {
+      console.error("Failed to load transactions", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [account.id]);
 
   return (
     <>
@@ -59,9 +117,20 @@ export default function AccountDetailsPanel({
             <Text style={styles.title}>{account.name}</Text>
             <Text style={styles.accountId}>ID: {account.id}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: isProfit ? '#4caf5020' : '#f4433620' }]}>
-            <Text style={[styles.statusText, { color: isProfit ? '#4caf50' : '#f44336' }]}>
-              {isProfit ? '↑' : '↓'} {Math.abs(parseFloat(balanceChangePercentage))}%
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: isProfit ? "#4caf5020" : "#f4433620" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                { color: isProfit ? "#4caf50" : "#f44336" },
+              ]}
+            >
+              {isProfit ? "↑" : "↓"}{" "}
+              {Math.abs(parseFloat(balanceChangePercentage))}%
             </Text>
           </View>
         </View>
@@ -83,18 +152,25 @@ export default function AccountDetailsPanel({
               <Text style={styles.balanceIconText}>📊</Text>
             </View>
             <Text style={styles.balanceLabel}>Current</Text>
-            <Text style={[styles.balanceValue, { color: '#00d4d4' }]}>
+            <Text style={[styles.balanceValue, { color: "#00d4d4" }]}>
               ${account.currentBalance.toLocaleString()}
             </Text>
           </View>
 
           <View style={styles.balanceCard}>
             <View style={styles.balanceIcon}>
-              <Text style={styles.balanceIconText}>{isProfit ? '📈' : '📉'}</Text>
+              <Text style={styles.balanceIconText}>
+                {isProfit ? "📈" : "📉"}
+              </Text>
             </View>
             <Text style={styles.balanceLabel}>Change</Text>
-            <Text style={[styles.balanceValue, { color: isProfit ? '#4caf50' : '#f44336' }]}>
-              {isProfit ? '+' : ''}${balanceChange.toLocaleString()}
+            <Text
+              style={[
+                styles.balanceValue,
+                { color: isProfit ? "#4caf50" : "#f44336" },
+              ]}
+            >
+              {isProfit ? "+" : ""}${balanceChange.toLocaleString()}
             </Text>
           </View>
         </View>
@@ -103,38 +179,50 @@ export default function AccountDetailsPanel({
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>ROI</Text>
-            <Text style={[styles.statValue, { color: isProfit ? '#4caf50' : '#f44336' }]}>
-              {isProfit ? '+' : ''}{balanceChangePercentage}%
+            <Text
+              style={[
+                styles.statValue,
+                { color: isProfit ? "#4caf50" : "#f44336" },
+              ]}
+            >
+              {isProfit ? "+" : ""}
+              {balanceChangePercentage}%
             </Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Type</Text>
-            <Text style={styles.statValue}>{account.type ? (account.type === 'demo' ? 'Demo' : 'Live') : 'Demo'}</Text>
+            <Text style={styles.statValue}>
+              {account.type
+                ? account.type === "demo"
+                  ? "Demo"
+                  : "Live"
+                : "Demo"}
+            </Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Status</Text>
-            <Text style={[styles.statValue, { color: '#4caf50' }]}>Active</Text>
+            <Text style={[styles.statValue, { color: "#4caf50" }]}>Active</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.actionButton, styles.depositButton]}
             onPress={() => {
-              setTransactionType('deposit');
+              setTransactionType("deposit");
               setShowTransactionModal(true);
             }}
           >
             <Text style={styles.actionIcon}>💵</Text>
             <Text style={styles.actionText}>Deposit</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.actionButton, styles.withdrawButton]}
             onPress={() => {
-              setTransactionType('withdrawal');
+              setTransactionType("withdrawal");
               setShowTransactionModal(true);
             }}
           >
@@ -142,32 +230,99 @@ export default function AccountDetailsPanel({
             <Text style={styles.actionText}>Withdraw</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Edit/Delete Actions */}
         {(onEdit || onDelete) && (
-          <View style={[styles.accountActions, {justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#333', paddingTop: 16, marginTop: 16}]}>
+          <View
+            style={[
+              styles.accountActions,
+              {
+                justifyContent: "space-between",
+                borderTopWidth: 1,
+                borderTopColor: "#333",
+                paddingTop: 16,
+                marginTop: 16,
+              },
+            ]}
+          >
             {onEdit && (
-              <TouchableOpacity style={[styles.accountActionButton, {padding: 8, backgroundColor: '#2a2a2a'}]} onPress={onEdit}>
-                <Text style={[styles.editIcon, {marginRight: 6}]}>✏️</Text>
-                <Text style={[styles.accountActionText, {fontWeight: '600'}]}>Edit</Text>
+              <TouchableOpacity
+                style={[
+                  styles.accountActionButton,
+                  { padding: 8, backgroundColor: "#2a2a2a" },
+                ]}
+                onPress={onEdit}
+              >
+                <Text style={[styles.editIcon, { marginRight: 6 }]}>✏️</Text>
+                <Text style={[styles.accountActionText, { fontWeight: "600" }]}>
+                  Edit
+                </Text>
               </TouchableOpacity>
             )}
             {onDelete && (
-              <TouchableOpacity style={[styles.accountActionButton, {padding: 8, backgroundColor: '#2a2a2a'}]} onPress={onDelete}>
-                <Text style={[styles.deleteIcon, {marginRight: 6}]}>🗑️</Text>
-                <Text style={[styles.accountActionText, {fontWeight: '600'}]}>Delete</Text>
+              <TouchableOpacity
+                style={[
+                  styles.accountActionButton,
+                  { padding: 8, backgroundColor: "#2a2a2a" },
+                ]}
+                onPress={onDelete}
+              >
+                <Text style={[styles.deleteIcon, { marginRight: 6 }]}>🗑️</Text>
+                <Text style={[styles.accountActionText, { fontWeight: "600" }]}>
+                  Delete
+                </Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {/* Recent Activity Placeholder */}
+        {/* Recent Activity */}
         <View style={styles.activitySection}>
           <Text style={styles.activityTitle}>Recent Activity</Text>
-          <View style={styles.emptyActivity}>
-            <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyText}>No recent transactions</Text>
-          </View>
+          {transactions && transactions.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {transactions.map((t) => (
+                <View
+                  key={t.id}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    backgroundColor: "#0d0d0d",
+                    padding: 10,
+                    borderRadius: 8,
+                  }}
+                >
+                  <View>
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      {t.type === "deposit" ? "Deposit" : "Withdrawal"}
+                    </Text>
+                    <Text style={{ color: "#888", fontSize: 12 }}>
+                      {new Date(t.createdAt).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text
+                      style={{
+                        color: t.type === "deposit" ? "#4caf50" : "#f44336",
+                        fontWeight: "700",
+                      }}
+                    >
+                      ${Number(t.amount).toLocaleString()}
+                    </Text>
+                    <Text style={{ color: "#888", fontSize: 12 }}>
+                      Balance: ${Number(t.balanceAfter).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.emptyText}>No recent transactions</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -182,7 +337,9 @@ export default function AccountDetailsPanel({
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {transactionType === 'deposit' ? '💵 Deposit Funds' : '💸 Withdraw Funds'}
+                {transactionType === "deposit"
+                  ? "💵 Deposit Funds"
+                  : "💸 Withdraw Funds"}
               </Text>
               <TouchableOpacity onPress={() => setShowTransactionModal(false)}>
                 <Text style={styles.closeIcon}>×</Text>
@@ -204,7 +361,7 @@ export default function AccountDetailsPanel({
               </View>
 
               <View style={styles.quickAmounts}>
-                {['100', '500', '1000', '5000'].map((preset) => (
+                {["100", "500", "1000", "5000"].map((preset) => (
                   <TouchableOpacity
                     key={preset}
                     style={styles.quickAmountButton}
@@ -216,15 +373,17 @@ export default function AccountDetailsPanel({
               </View>
 
               <View style={styles.modalActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalButton, styles.confirmButton]}
                   onPress={handleTransaction}
                 >
                   <Text style={styles.confirmButtonText}>
-                    {transactionType === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds'}
+                    {transactionType === "deposit"
+                      ? "Deposit Funds"
+                      : "Withdraw Funds"}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => setShowTransactionModal(false)}
                 >
@@ -246,12 +405,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a1a",
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.15)',
+    borderColor: "rgba(0, 212, 212, 0.15)",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   title: {
@@ -263,7 +422,6 @@ const styles = StyleSheet.create({
   accountId: {
     fontSize: 11,
     color: "#666",
-    fontFamily: 'monospace',
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -272,29 +430,29 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   balanceGrid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 16,
   },
   balanceCard: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: "#0d0d0d",
     borderRadius: 10,
     padding: 12,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: "rgba(255, 255, 255, 0.05)",
   },
   balanceIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
   balanceIconText: {
@@ -305,7 +463,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
     color: "#aaa",
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   balanceValue: {
@@ -314,77 +472,77 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   statsRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0, 212, 212, 0.05)',
+    flexDirection: "row",
+    backgroundColor: "rgba(0, 212, 212, 0.05)",
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   statItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#aaa',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#aaa",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   statValue: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
   statDivider: {
     width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     marginHorizontal: 8,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 16,
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     borderRadius: 8,
     gap: 6,
   },
   depositButton: {
-    backgroundColor: '#4caf50',
+    backgroundColor: "#4caf50",
   },
   withdrawButton: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
     borderWidth: 1,
-    borderColor: '#00d4d4',
+    borderColor: "#00d4d4",
   },
   actionIcon: {
     fontSize: 16,
   },
   actionText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   activitySection: {
     marginTop: 8,
   },
   activityTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
     marginBottom: 12,
   },
   emptyActivity: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: 24,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: "#0d0d0d",
     borderRadius: 8,
   },
   emptyIcon: {
@@ -392,23 +550,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyText: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   accountActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: "#333",
     paddingTop: 16,
     marginTop: 16,
   },
   accountActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 8,
     borderRadius: 6,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
   },
   editIcon: {
     fontSize: 16,
@@ -419,93 +577,93 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   accountActionText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 16,
   },
   modalContent: {
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.2)',
+    borderColor: "rgba(0, 212, 212, 0.2)",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
   closeIcon: {
     fontSize: 28,
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
   },
   modalBody: {
     padding: 20,
   },
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#aaa',
+    fontWeight: "600",
+    color: "#aaa",
     marginBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0d0d0d',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0d0d0d",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#00d4d4',
+    borderColor: "#00d4d4",
     paddingHorizontal: 12,
     marginBottom: 16,
   },
   currencySymbol: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#00d4d4',
+    fontWeight: "700",
+    color: "#00d4d4",
     marginRight: 8,
   },
   input: {
     flex: 1,
     paddingVertical: 14,
     fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
   quickAmounts: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 20,
   },
   quickAmountButton: {
     flex: 1,
     paddingVertical: 10,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   quickAmountText: {
-    color: '#00d4d4',
+    color: "#00d4d4",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   modalActions: {
     gap: 10,
@@ -513,22 +671,22 @@ const styles = StyleSheet.create({
   modalButton: {
     paddingVertical: 14,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   confirmButton: {
-    backgroundColor: '#00d4d4',
+    backgroundColor: "#00d4d4",
   },
   confirmButtonText: {
-    color: '#0d0d0d',
+    color: "#0d0d0d",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   cancelButton: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
   },
   cancelButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

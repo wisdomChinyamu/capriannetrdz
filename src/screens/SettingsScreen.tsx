@@ -9,8 +9,9 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { Alert } from "react-native";
 import { useAppContext } from "../hooks/useAppContext";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../components/ThemeProvider";
 import EditableChecklistTable from "../components/EditableChecklistTable";
 import { ChecklistItem, Strategy } from "../types";
@@ -20,6 +21,8 @@ import {
   updateStrategy,
   deleteStrategy,
 } from "../services/firebaseService";
+import { logout } from "../services/firebaseService";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function SettingsScreen() {
   const { colors, mode, setMode } = useTheme();
@@ -33,9 +36,17 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [newStrategyName, setNewStrategyName] = useState("");
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [confirmStrategyId, setConfirmStrategyId] = useState<string | null>(
+    null
+  );
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const toggleMode = () => {
-    setMode(mode === 'dark' ? 'light' : 'dark');
+    setMode(mode === "dark" ? "light" : "dark");
+  };
+
+  const handleUiScaleChange = (scale: "small" | "normal" | "large") => {
+    dispatch({ type: "SET_UI_SCALE", payload: scale });
   };
 
   useEffect(() => {
@@ -111,7 +122,12 @@ export default function SettingsScreen() {
             Manage your trading preferences
           </Text>
         </View>
-        <View style={[styles.headerBadge, { backgroundColor: `${colors.highlight}20` }]}>
+        <View
+          style={[
+            styles.headerBadge,
+            { backgroundColor: `${colors.highlight}20` },
+          ]}
+        >
           <Text style={[styles.headerBadgeText, { color: colors.highlight }]}>
             ⚙️
           </Text>
@@ -125,13 +141,22 @@ export default function SettingsScreen() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               📊 Strategies & Checklists
             </Text>
-            <Text style={[styles.sectionDescription, { color: colors.subtext }]}>
+            <Text
+              style={[styles.sectionDescription, { color: colors.subtext }]}
+            >
               Create and manage strategies. Each strategy has its own checklist.
             </Text>
           </View>
           {strategies.length > 0 && (
-            <View style={[styles.countBadge, { backgroundColor: `${colors.highlight}15` }]}>
-              <Text style={[styles.countBadgeText, { color: colors.highlight }]}>
+            <View
+              style={[
+                styles.countBadge,
+                { backgroundColor: `${colors.highlight}15` },
+              ]}
+            >
+              <Text
+                style={[styles.countBadgeText, { color: colors.highlight }]}
+              >
                 {strategies.length}
               </Text>
             </View>
@@ -160,7 +185,9 @@ export default function SettingsScreen() {
             style={[
               styles.createButton,
               {
-                backgroundColor: newStrategyName.trim() ? colors.highlight : colors.neutral,
+                backgroundColor: newStrategyName.trim()
+                  ? colors.highlight
+                  : colors.neutral,
               },
             ]}
             onPress={handleCreateStrategy}
@@ -170,7 +197,9 @@ export default function SettingsScreen() {
             {loading ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <Text style={[styles.createButtonText, { color: colors.background }]}>
+              <Text
+                style={[styles.createButtonText, { color: colors.background }]}
+              >
                 + Add
               </Text>
             )}
@@ -183,7 +212,7 @@ export default function SettingsScreen() {
             {strategies.map((strategy) => {
               const isSelected = selectedStrategyId === strategy.id;
               const isHovered = hoveredItem === strategy.id;
-              
+
               return (
                 <View
                   key={strategy.id}
@@ -193,15 +222,17 @@ export default function SettingsScreen() {
                       backgroundColor: isSelected
                         ? `${colors.highlight}15`
                         : colors.surface,
-                      borderColor: isSelected ? colors.highlight : 'transparent',
+                      borderColor: isSelected
+                        ? colors.highlight
+                        : "transparent",
                       borderWidth: 2,
                     },
                   ]}
                   {...Platform.select({
                     web: {
                       onMouseEnter: () => setHoveredItem(strategy.id),
-                      onMouseLeave: () => setHoveredItem(null)
-                    }
+                      onMouseLeave: () => setHoveredItem(null),
+                    },
                   })}
                 >
                   <TouchableOpacity
@@ -238,20 +269,30 @@ export default function SettingsScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.checklistCount, { color: colors.subtext }]}>
+                    <Text
+                      style={[styles.checklistCount, { color: colors.subtext }]}
+                    >
                       {strategy.checklist?.length || 0} items
                     </Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
-                    onPress={() => handleDeleteStrategy(strategy.id)}
+                    onPress={() => {
+                      setConfirmStrategyId(strategy.id);
+                      setConfirmVisible(true);
+                    }}
                     style={[
                       styles.deleteButton,
                       { backgroundColor: `${colors.lossEnd}20` },
                     ]}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.deleteButtonText, { color: colors.lossEnd }]}>
+                    <Text
+                      style={[
+                        styles.deleteButtonText,
+                        { color: colors.lossEnd },
+                      ]}
+                    >
                       🗑️
                     </Text>
                   </TouchableOpacity>
@@ -280,7 +321,9 @@ export default function SettingsScreen() {
               <Text style={[styles.checklistTitle, { color: colors.text }]}>
                 ✏️ Edit Checklist
               </Text>
-              <Text style={[styles.checklistSubtitle, { color: colors.subtext }]}>
+              <Text
+                style={[styles.checklistSubtitle, { color: colors.subtext }]}
+              >
                 {strategies.find((s) => s.id === selectedStrategyId)?.name}
               </Text>
             </View>
@@ -310,11 +353,103 @@ export default function SettingsScreen() {
                 const current =
                   strategies.find((s) => s.id === selectedStrategyId)
                     ?.checklist || [];
-                handleUpdateChecklist(current.filter((i) => i.id !== itemId));
+                Alert.alert(
+                  "Delete Checklist Item",
+                  "Are you sure you want to delete this checklist item?",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () =>
+                        handleUpdateChecklist(
+                          current.filter((i) => i.id !== itemId)
+                        ),
+                    },
+                  ]
+                );
               }}
             />
           </View>
         )}
+      </View>
+
+      {/* UI Scale Settings */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          🔍 UI Scale
+        </Text>
+        <View style={styles.scaleOptionsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.scaleOption,
+              appContextState.uiScale === "small" && styles.scaleOptionActive,
+              { backgroundColor: colors.surface },
+            ]}
+            onPress={() => handleUiScaleChange("small")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.scaleOptionText,
+                {
+                  color:
+                    appContextState.uiScale === "small"
+                      ? colors.highlight
+                      : colors.text,
+                },
+              ]}
+            >
+              Small
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.scaleOption,
+              appContextState.uiScale === "normal" && styles.scaleOptionActive,
+              { backgroundColor: colors.surface },
+            ]}
+            onPress={() => handleUiScaleChange("normal")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.scaleOptionText,
+                {
+                  color:
+                    appContextState.uiScale === "normal"
+                      ? colors.highlight
+                      : colors.text,
+                },
+              ]}
+            >
+              Normal
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.scaleOption,
+              appContextState.uiScale === "large" && styles.scaleOptionActive,
+              { backgroundColor: colors.surface },
+            ]}
+            onPress={() => handleUiScaleChange("large")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.scaleOptionText,
+                {
+                  color:
+                    appContextState.uiScale === "large"
+                      ? colors.highlight
+                      : colors.text,
+                },
+              ]}
+            >
+              Large
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Theme Settings */}
@@ -325,25 +460,33 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[
             styles.settingItem,
-            { backgroundColor: colors.surface, borderColor: `${colors.highlight}30` },
+            {
+              backgroundColor: colors.surface,
+              borderColor: `${colors.highlight}30`,
+            },
           ]}
           onPress={toggleMode}
           activeOpacity={0.7}
         >
           <View style={styles.settingLeft}>
             <Text style={[styles.settingIcon, { color: colors.highlight }]}>
-              {mode === 'dark' ? '🌙' : '☀️'}
+              {mode === "dark" ? "🌙" : "☀️"}
             </Text>
             <View>
               <Text style={[styles.settingLabel, { color: colors.text }]}>
-                {mode === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                {mode === "dark" ? "Dark Mode" : "Light Mode"}
               </Text>
               <Text style={[styles.settingHint, { color: colors.subtext }]}>
                 Tap to switch theme
               </Text>
             </View>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: `${colors.profitEnd}20` }]}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: `${colors.profitEnd}20` },
+            ]}
+          >
             <Text style={[styles.statusBadgeText, { color: colors.profitEnd }]}>
               Active
             </Text>
@@ -356,20 +499,29 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           👤 Account
         </Text>
-        
+
         <TouchableOpacity
           style={[
             styles.settingItem,
-            { backgroundColor: colors.surface, borderColor: `${colors.highlight}30` },
+            {
+              backgroundColor: colors.surface,
+              borderColor: `${colors.highlight}30`,
+            },
           ]}
           activeOpacity={0.8}
-          onPress={() => (navigation as any).navigate('Accounts')}
+          onPress={() => (navigation as any).navigate("Accounts")}
         >
           <View style={styles.settingLeft}>
-            <Text style={[styles.settingIcon, { color: colors.highlight }]}>🏦</Text>
+            <Text style={[styles.settingIcon, { color: colors.highlight }]}>
+              🏦
+            </Text>
             <View>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Manage Accounts</Text>
-              <Text style={[styles.settingHint, { color: colors.subtext }]}>Create and edit trading accounts</Text>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>
+                Manage Accounts
+              </Text>
+              <Text style={[styles.settingHint, { color: colors.subtext }]}>
+                Create and edit trading accounts
+              </Text>
             </View>
           </View>
           <Text style={[styles.chevron, { color: colors.subtext }]}>›</Text>
@@ -378,7 +530,50 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[
             styles.settingItem,
-            { backgroundColor: colors.surface, borderColor: `${colors.highlight}30` },
+            {
+              backgroundColor: colors.surface,
+              borderColor: `${colors.highlight}30`,
+            },
+          ]}
+          activeOpacity={0.8}
+          onPress={async () => {
+            try {
+              await logout();
+              try {
+                dispatch({ type: "SET_USER", payload: null });
+              } catch {}
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              } as any);
+            } catch (e) {
+              console.error("Logout failed", e);
+              Alert.alert("Error", "Failed to logout.");
+            }
+          }}
+        >
+          <View style={styles.settingLeft}>
+            <Text style={[styles.settingIcon, { color: colors.highlight }]}>
+              ⏏️
+            </Text>
+            <View>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>
+                Logout
+              </Text>
+              <Text style={[styles.settingHint, { color: colors.subtext }]}>
+                Sign out of this device
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.settingItem,
+            {
+              backgroundColor: colors.surface,
+              borderColor: `${colors.highlight}30`,
+            },
           ]}
           activeOpacity={0.7}
         >
@@ -410,6 +605,30 @@ export default function SettingsScreen() {
       </View>
 
       <View style={{ height: 40 }} />
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Delete Strategy"
+        message="Delete this strategy and its checklist? This cannot be undone."
+        onCancel={() => {
+          setConfirmVisible(false);
+          setConfirmStrategyId(null);
+        }}
+        onConfirm={async () => {
+          if (!confirmStrategyId) return;
+          setConfirmVisible(false);
+          const id = confirmStrategyId;
+          setConfirmStrategyId(null);
+          setLoading(true);
+          try {
+            await handleDeleteStrategy(id);
+          } catch (e) {
+            console.error("Failed to delete strategy", e);
+            Alert.alert("Error", "Failed to delete strategy");
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
     </ScrollView>
   );
 }
@@ -452,7 +671,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -521,7 +740,7 @@ const styles = StyleSheet.create({
     padding: 14,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -605,6 +824,27 @@ const styles = StyleSheet.create({
   checklistSubtitle: {
     fontSize: 13,
     fontWeight: "500",
+  },
+  scaleOptionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  scaleOption: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
+  scaleOptionActive: {
+    borderColor: "#00d4d4", // highlight color
+  },
+  scaleOptionText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
   settingItem: {
     flexDirection: "row",

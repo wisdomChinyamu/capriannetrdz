@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { useTheme } from "./ThemeProvider";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { Trade } from "../types";
 import { calculateWinRate } from "../utils/calculations";
@@ -16,7 +17,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
   const strokeWidth = 24;
 
   const completedTrades = trades.filter((t) => t.result);
-  
+
   if (completedTrades.length === 0) {
     return (
       <View style={styles.container}>
@@ -31,6 +32,8 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
       </View>
     );
   }
+
+  const { fontFamily } = useTheme();
 
   const wins = completedTrades.filter((t) => t.result === "Win").length;
   const losses = completedTrades.filter((t) => t.result === "Loss").length;
@@ -135,6 +138,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
             fontWeight="700"
             fill="#00d4d4"
             textAnchor="middle"
+            fontFamily={fontFamily}
           >
             {winPercentage.toFixed(0)}%
           </SvgText>
@@ -145,6 +149,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
             fill="#aaa"
             textAnchor="middle"
             fontWeight="600"
+            fontFamily={fontFamily}
           >
             Win Rate
           </SvgText>
@@ -155,7 +160,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={styles.legendIcon}>
-            <View style={[styles.legendDot, { backgroundColor: '#4caf50' }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#4caf50" }]} />
           </View>
           <View style={styles.legendInfo}>
             <Text style={styles.legendLabel}>Wins</Text>
@@ -167,7 +172,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
 
         <View style={styles.legendItem}>
           <View style={styles.legendIcon}>
-            <View style={[styles.legendDot, { backgroundColor: '#f44336' }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#f44336" }]} />
           </View>
           <View style={styles.legendInfo}>
             <Text style={styles.legendLabel}>Losses</Text>
@@ -180,7 +185,9 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
         {breakEven > 0 && (
           <View style={styles.legendItem}>
             <View style={styles.legendIcon}>
-              <View style={[styles.legendDot, { backgroundColor: '#ffa500' }]} />
+              <View
+                style={[styles.legendDot, { backgroundColor: "#ffa500" }]}
+              />
             </View>
             <View style={styles.legendInfo}>
               <Text style={styles.legendLabel}>Break-even</Text>
@@ -201,7 +208,7 @@ export default function WinRatePieChart({ trades }: WinRatePieChartProps) {
         <View style={styles.statDivider} />
         <View style={styles.overallStatItem}>
           <Text style={styles.overallStatLabel}>Win Rate</Text>
-          <Text style={[styles.overallStatValue, { color: '#00d4d4' }]}>
+          <Text style={[styles.overallStatValue, { color: "#00d4d4" }]}>
             {calculateWinRate(trades).toFixed(1)}%
           </Text>
         </View>
@@ -220,9 +227,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   title: {
@@ -231,28 +238,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   badge: {
-    backgroundColor: 'rgba(0, 212, 212, 0.1)',
+    backgroundColor: "rgba(0, 212, 212, 0.1)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   badgeText: {
-    color: '#00d4d4',
+    color: "#00d4d4",
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   emptyState: {
     padding: 40,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyIcon: {
     fontSize: 48,
     marginBottom: 12,
   },
   emptyTitle: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 4,
   },
   emptyText: {
@@ -261,28 +268,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   chartContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 16,
   },
   legend: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: "rgba(255,255,255,0.05)",
     gap: 12,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   legendIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
   },
   legendDot: {
     width: 12,
@@ -293,9 +300,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   legendLabel: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   legendValue: {
@@ -304,32 +311,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   overallStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0, 212, 212, 0.05)',
+    flexDirection: "row",
+    backgroundColor: "rgba(0, 212, 212, 0.05)",
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
   },
   overallStatItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   overallStatLabel: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   overallStatValue: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   statDivider: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: "rgba(255,255,255,0.1)",
     marginHorizontal: 8,
   },
 });

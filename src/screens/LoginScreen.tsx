@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../config/firebase";
+import { useToast } from '../context/ToastContext';
 import { useTheme } from "../components/ThemeProvider";
 
 export default function LoginScreen({ navigation }: any) {
@@ -22,6 +23,7 @@ export default function LoginScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const toast = useToast();
 
   const validateForm = () => {
     if (!email.trim()) {
@@ -45,7 +47,7 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      Alert.alert("Success", "Welcome back to Caprianne Trdz!");
+      try { toast.show('Welcome back to Caprianne Trdz!', 'success'); } catch (e) {}
       navigation.replace("Dashboard"); // Navigate to dashboard after login
     } catch (error: any) {
       let errorMessage = "An error occurred during login";
@@ -62,6 +64,7 @@ export default function LoginScreen({ navigation }: any) {
         errorMessage = "Too many failed attempts. Please try again later or reset your password.";
       }
       
+      try { toast.show(errorMessage, 'error'); } catch (e) {}
       Alert.alert("Login Error", errorMessage);
     } finally {
       setLoading(false);

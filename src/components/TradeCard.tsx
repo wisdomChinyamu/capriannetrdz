@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Trade } from '../types';
 import { useTheme } from './ThemeProvider';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface TradeCardProps {
   trade: Trade;
@@ -10,6 +11,9 @@ interface TradeCardProps {
 
 export default function TradeCard({ trade, onPress }: TradeCardProps) {
   const { colors } = useTheme();
+  const { state } = useAppContext();
+  const uiScale = state.uiScale || 'normal';
+  const scaleMultiplier = uiScale === 'small' ? 0.86 : uiScale === 'large' ? 1.12 : 1;
   
   // Dynamic color assignment with gradient effect
   const getResultColors = () => {
@@ -61,12 +65,12 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
         styles.card,
         {
           backgroundColor: bgColor,
-          borderLeftWidth: 4,
+          borderLeftWidth: 4 * scaleMultiplier,
           borderLeftColor: resultColors.glow,
           shadowColor: resultColors.glow,
-          shadowOffset: { width: 0, height: 4 },
+          shadowOffset: { width: 0, height: 4 * scaleMultiplier },
           shadowOpacity: 0.15,
-          shadowRadius: 8,
+          shadowRadius: 8 * scaleMultiplier,
           elevation: 6,
         },
       ]}
@@ -76,7 +80,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.pairSection}>
-          <Text style={[styles.pair, { color: colors.text }]}>
+          <Text style={[styles.pair, { color: colors.text, fontSize: 20 * scaleMultiplier }]}>
             {trade.pair}
           </Text>
           <View
@@ -98,6 +102,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
                     trade.direction === 'Buy'
                       ? colors.profitEnd
                       : colors.lossEnd,
+                  fontSize: 11 * scaleMultiplier,
                 },
               ]}
             >
@@ -110,12 +115,12 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
             styles.resultBadge,
             {
               backgroundColor: `${resultColors.glow}20`,
-              borderWidth: 1,
+              borderWidth: 1 * scaleMultiplier,
               borderColor: `${resultColors.glow}40`,
             },
           ]}
         >
-          <Text style={[styles.resultText, { color: resultColors.text }]}>
+          <Text style={[styles.resultText, { color: resultColors.text, fontSize: 13 * scaleMultiplier }]}>
             {trade.result || 'Pending'}
           </Text>
         </View>
@@ -124,7 +129,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
-          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+          <Text style={[styles.statLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
             Risk:Reward
           </Text>
           <Text
@@ -133,6 +138,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
               { 
                 color: colors.highlight,
                 fontWeight: '800',
+                fontSize: 18 * scaleMultiplier,
               },
             ]}
           >
@@ -140,31 +146,31 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
           </Text>
         </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.neutral }]} />
+        <View style={[styles.divider, { backgroundColor: colors.neutral, height: 32 * scaleMultiplier }]} />
 
         <View style={styles.statBox}>
-          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+          <Text style={[styles.statLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
             Confluence
           </Text>
           <View style={styles.scoreContainer}>
             <Text
               style={[
                 styles.statValue,
-                { color: colors.text, fontWeight: '800' },
+                { color: colors.text, fontWeight: '800', fontSize: 18 * scaleMultiplier },
               ]}
             >
               {trade.confluenceScore}
             </Text>
-            <Text style={[styles.scoreUnit, { color: colors.subtext }]}>
+            <Text style={[styles.scoreUnit, { color: colors.subtext, fontSize: 12 * scaleMultiplier }]}>
               /100
             </Text>
           </View>
         </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.neutral }]} />
+        <View style={[styles.divider, { backgroundColor: colors.neutral, height: 32 * scaleMultiplier }]} />
 
         <View style={styles.statBox}>
-          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+          <Text style={[styles.statLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
             Grade
           </Text>
           <View
@@ -172,7 +178,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
               styles.gradeBadge,
               {
                 backgroundColor: `${getGradeColor()}15`,
-                borderWidth: 1.5,
+                borderWidth: 1.5 * scaleMultiplier,
                 borderColor: `${getGradeColor()}50`,
               },
             ]}
@@ -180,7 +186,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
             <Text
               style={[
                 styles.gradeText,
-                { color: getGradeColor(), fontWeight: '900' },
+                { color: getGradeColor(), fontWeight: '900', fontSize: 16 * scaleMultiplier },
               ]}
             >
               {trade.grade}
@@ -193,7 +199,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
       <View
         style={[
           styles.footer,
-          { borderTopColor: `${colors.text}10`, borderTopWidth: 1 },
+          { borderTopColor: `${colors.text}10`, borderTopWidth: 1 * scaleMultiplier },
         ]}
       >
         <View style={styles.footerLeft}>
@@ -203,7 +209,7 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
               { backgroundColor: `${colors.highlight}15` },
             ]}
           >
-            <Text style={[styles.setupText, { color: colors.highlight }]}>
+            <Text style={[styles.setupText, { color: colors.highlight, fontSize: 11 * scaleMultiplier }]}>
               {trade.setupType}
             </Text>
           </View>
@@ -214,17 +220,17 @@ export default function TradeCard({ trade, onPress }: TradeCardProps) {
                 { backgroundColor: `${colors.lossEnd}20` },
               ]}
             >
-              <Text style={[styles.deviationText, { color: colors.lossEnd }]}>
+              <Text style={[styles.deviationText, { color: colors.lossEnd, fontSize: 10 * scaleMultiplier }]}>
                 ⚠ Deviation
               </Text>
             </View>
           )}
         </View>
         <View style={styles.footerRight}>
-          <Text style={[styles.sessionText, { color: colors.subtext }]}>
+          <Text style={[styles.sessionText, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
             {trade.session}
           </Text>
-          <Text style={[styles.dateText, { color: colors.subtext }]}>
+          <Text style={[styles.dateText, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>
             {trade.createdAt.toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',

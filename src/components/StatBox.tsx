@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useTheme } from './ThemeProvider';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface StatBoxProps {
   label: string;
@@ -24,6 +25,10 @@ export default function StatBox({
   highlight = false,
 }: StatBoxProps) {
   const { colors } = useTheme();
+  const { state } = useAppContext();
+  const uiScale = state.uiScale || 'normal';
+  const scaleMultiplier = uiScale === 'small' ? 0.86 : uiScale === 'large' ? 1.12 : 1;
+  
   const bgColor = colors.card ?? colors.surface;
   const textColor = colors.text;
   const secondaryTextColor = colors.subtext;
@@ -58,24 +63,24 @@ export default function StatBox({
     switch (size) {
       case 'small':
         return {
-          minHeight: 70,
-          valueSize: 20,
-          labelSize: 11,
-          unitSize: 11,
+          minHeight: 70 * scaleMultiplier,
+          valueSize: 20 * scaleMultiplier,
+          labelSize: 11 * scaleMultiplier,
+          unitSize: 11 * scaleMultiplier,
         };
       case 'large':
         return {
-          minHeight: 100,
-          valueSize: 32,
-          labelSize: 13,
-          unitSize: 14,
+          minHeight: 100 * scaleMultiplier,
+          valueSize: 32 * scaleMultiplier,
+          labelSize: 13 * scaleMultiplier,
+          unitSize: 14 * scaleMultiplier,
         };
       default:
         return {
-          minHeight: 85,
-          valueSize: 26,
-          labelSize: 12,
-          unitSize: 12,
+          minHeight: 85 * scaleMultiplier,
+          valueSize: 26 * scaleMultiplier,
+          labelSize: 12 * scaleMultiplier,
+          unitSize: 12 * scaleMultiplier,
         };
     }
   };
@@ -89,12 +94,12 @@ export default function StatBox({
         {
           backgroundColor: bgColor,
           minHeight: sizeConfig.minHeight,
-          borderWidth: highlight ? 2 : 0,
+          borderWidth: highlight ? 2 * scaleMultiplier : 0,
           borderColor: highlight ? `${accentColor}40` : 'transparent',
           shadowColor: highlight ? accentColor : '#000',
-          shadowOffset: { width: 0, height: highlight ? 6 : 3 },
+          shadowOffset: { width: 0, height: highlight ? 6 * scaleMultiplier : 3 * scaleMultiplier },
           shadowOpacity: highlight ? 0.25 : 0.1,
-          shadowRadius: highlight ? 12 : 6,
+          shadowRadius: highlight ? 12 * scaleMultiplier : 6 * scaleMultiplier,
         },
       ]}
     >
@@ -112,7 +117,7 @@ export default function StatBox({
           {label.toUpperCase()}
         </Text>
         {icon && (
-          <Text style={[styles.icon, { color: accentColor }]}>{icon}</Text>
+          <Text style={[styles.icon, { color: accentColor, fontSize: 18 * scaleMultiplier }]}>{icon}</Text>
         )}
       </View>
 
@@ -154,7 +159,7 @@ export default function StatBox({
               { backgroundColor: `${getTrendColor()}20` },
             ]}
           >
-            <Text style={[styles.trendIcon, { color: getTrendColor() }]}>
+            <Text style={[styles.trendIcon, { color: getTrendColor(), fontSize: 16 * scaleMultiplier }]}>
               {getTrendIcon()}
             </Text>
           </View>

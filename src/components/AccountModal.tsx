@@ -9,7 +9,7 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { TradingAccount } from '../types';
+import { TradingAccount } from "../types";
 import AccountForm from "./AccountForm";
 
 interface AccountModalProps {
@@ -19,8 +19,15 @@ interface AccountModalProps {
   onSelect: (id: string) => void;
   onAddAccount: () => void;
   onClose: () => void;
-  onCreateAccount: (name: string, startingBalance: number, type?: 'demo' | 'live') => Promise<void>;
-  onUpdateAccount?: (accountId: string, updates: Partial<TradingAccount>) => Promise<void>;
+  onCreateAccount: (
+    name: string,
+    startingBalance: number,
+    type?: "demo" | "live"
+  ) => Promise<void>;
+  onUpdateAccount?: (
+    accountId: string,
+    updates: Partial<TradingAccount>
+  ) => Promise<void>;
   onDeleteAccount?: (accountId: string) => Promise<void>;
   editingAccount?: TradingAccount | null;
 }
@@ -37,7 +44,7 @@ export default function AccountModal({
   onDeleteAccount,
   editingAccount,
 }: AccountModalProps) {
-  const [mode, setMode] = useState<'select' | 'create' | 'edit'>('select');
+  const [mode, setMode] = useState<"select" | "create" | "edit">("select");
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(50)).current;
 
@@ -45,14 +52,14 @@ export default function AccountModal({
     if (visible) {
       // Determine mode based on whether we're editing an account
       if (editingAccount) {
-        setMode('edit');
+        setMode("edit");
       } else if (editingAccount === null && visible) {
         // Explicitly set to create mode when editingAccount is null but modal is visible
-        setMode('create');
+        setMode("create");
       } else {
-        setMode('select');
+        setMode("select");
       }
-      
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -69,29 +76,51 @@ export default function AccountModal({
     } else {
       fadeAnim.setValue(0);
       slideAnim.setValue(50);
-      setMode('select'); // Reset to select mode when closing
+      setMode("select"); // Reset to select mode when closing
     }
   }, [visible, editingAccount]);
 
   const handleClose = () => {
-    setMode('select');
+    setMode("select");
     onClose();
   };
 
-  const handleSaveAccount = async (name: string, startingBalance: number, type?: 'demo'|'live') => {
-    if (mode === 'create') {
+  const handleSaveAccount = async (
+    name: string,
+    startingBalance: number,
+    type?: "demo" | "live"
+  ) => {
+    if (mode === "create") {
       await onCreateAccount(name, startingBalance, type);
-    } else if (mode === 'edit' && editingAccount && onUpdateAccount) {
+    } else if (mode === "edit" && editingAccount && onUpdateAccount) {
       await onUpdateAccount(editingAccount.id, { name, startingBalance, type });
     }
     handleClose();
   };
 
   const handleDeleteAccount = async (accountId: string) => {
-    if (onDeleteAccount) {
-      await onDeleteAccount(accountId);
-      handleClose();
-    }
+    if (!onDeleteAccount) return;
+    // Confirm before deleting
+    // Using Alert from react-native (import missing here) - add dynamic import to avoid changing top imports
+    const { Alert } = require("react-native");
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete this account? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await onDeleteAccount(accountId);
+            } finally {
+              handleClose();
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -123,15 +152,20 @@ export default function AccountModal({
             },
           ]}
         >
-          {mode === 'select' ? (
+          {mode === "select" ? (
             <>
               {/* Header */}
               <View style={styles.header}>
                 <View>
                   <Text style={styles.title}>Select Trading Account</Text>
-                  <Text style={styles.subtitle}>{accounts.length} accounts available</Text>
+                  <Text style={styles.subtitle}>
+                    {accounts.length} accounts available
+                  </Text>
                 </View>
-                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}
+                >
                   <Text style={styles.closeIcon}>×</Text>
                 </TouchableOpacity>
               </View>
@@ -143,8 +177,12 @@ export default function AccountModal({
               >
                 {accounts.map((account) => {
                   const isSelected = selectedAccountId === account.id;
-                  const balanceChange = account.currentBalance - account.startingBalance;
-                  const changePercentage = ((balanceChange / account.startingBalance) * 100).toFixed(2);
+                  const balanceChange =
+                    account.currentBalance - account.startingBalance;
+                  const changePercentage = (
+                    (balanceChange / account.startingBalance) *
+                    100
+                  ).toFixed(2);
                   const isProfit = balanceChange >= 0;
 
                   return (
@@ -162,22 +200,28 @@ export default function AccountModal({
                     >
                       <View style={styles.accountCardHeader}>
                         <View style={styles.accountCardLeft}>
-                          <View style={[
-                            styles.accountAvatar,
-                            isSelected && { backgroundColor: '#00d4d4' }
-                          ]}>
+                          <View
+                            style={[
+                              styles.accountAvatar,
+                              isSelected && { backgroundColor: "#00d4d4" },
+                            ]}
+                          >
                             <Text style={styles.accountAvatarText}>
                               {account.name.charAt(0).toUpperCase()}
                             </Text>
                           </View>
                           <View style={styles.accountInfo}>
-                            <Text style={[
-                              styles.accountName,
-                              isSelected && styles.accountNameSelected
-                            ]}>
+                            <Text
+                              style={[
+                                styles.accountName,
+                                isSelected && styles.accountNameSelected,
+                              ]}
+                            >
                               {account.name}
                             </Text>
-                            <Text style={styles.accountId}>ID: {account.id}</Text>
+                            <Text style={styles.accountId}>
+                              ID: {account.id}
+                            </Text>
                           </View>
                         </View>
                         {isSelected && (
@@ -190,11 +234,15 @@ export default function AccountModal({
                       <View style={styles.accountCardBody}>
                         <View style={styles.balanceRow}>
                           <View style={styles.balanceItem}>
-                            <Text style={styles.balanceLabel}>Current Balance</Text>
-                            <Text style={[
-                              styles.balanceValue,
-                              isSelected && { color: '#00d4d4' }
-                            ]}>
+                            <Text style={styles.balanceLabel}>
+                              Current Balance
+                            </Text>
+                            <Text
+                              style={[
+                                styles.balanceValue,
+                                isSelected && { color: "#00d4d4" },
+                              ]}
+                            >
                               ${account.currentBalance.toLocaleString()}
                             </Text>
                           </View>
@@ -206,15 +254,25 @@ export default function AccountModal({
                           </View>
                         </View>
 
-                        <View style={[
-                          styles.performanceBadge,
-                          { backgroundColor: isProfit ? '#4caf5020' : '#f4433620' }
-                        ]}>
-                          <Text style={[
-                            styles.performanceText,
-                            { color: isProfit ? '#4caf50' : '#f44336' }
-                          ]}>
-                            {isProfit ? '↑' : '↓'} {isProfit ? '+' : ''}{changePercentage}% ({isProfit ? '+' : ''}${balanceChange.toLocaleString()})
+                        <View
+                          style={[
+                            styles.performanceBadge,
+                            {
+                              backgroundColor: isProfit
+                                ? "#4caf5020"
+                                : "#f4433620",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.performanceText,
+                              { color: isProfit ? "#4caf50" : "#f44336" },
+                            ]}
+                          >
+                            {isProfit ? "↑" : "↓"} {isProfit ? "+" : ""}
+                            {changePercentage}% ({isProfit ? "+" : ""}$
+                            {balanceChange.toLocaleString()})
                           </Text>
                         </View>
                       </View>
@@ -227,14 +285,16 @@ export default function AccountModal({
                   style={styles.addAccountCard}
                   onPress={() => {
                     onAddAccount();
-                    setMode('create');
+                    setMode("create");
                   }}
                 >
                   <View style={styles.addAccountIcon}>
                     <Text style={styles.addAccountIconText}>+</Text>
                   </View>
                   <View style={styles.addAccountInfo}>
-                    <Text style={styles.addAccountTitle}>Create New Account</Text>
+                    <Text style={styles.addAccountTitle}>
+                      Create New Account
+                    </Text>
                     <Text style={styles.addAccountSubtitle}>
                       Add a demo or live trading account
                     </Text>
@@ -245,17 +305,24 @@ export default function AccountModal({
 
               {/* Footer */}
               <View style={styles.footer}>
-                <TouchableOpacity style={styles.footerButton} onPress={handleClose}>
+                <TouchableOpacity
+                  style={styles.footerButton}
+                  onPress={handleClose}
+                >
                   <Text style={styles.footerButtonText}>Close</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <AccountForm
-              account={mode === 'edit' ? editingAccount : undefined}
+              account={mode === "edit" ? editingAccount : undefined}
               onSave={handleSaveAccount}
               onCancel={handleClose}
-              onDelete={mode === 'edit' && editingAccount && onDeleteAccount ? handleDeleteAccount : undefined}
+              onDelete={
+                mode === "edit" && editingAccount && onDeleteAccount
+                  ? handleDeleteAccount
+                  : undefined
+              }
             />
           )}
         </Animated.View>
@@ -369,7 +436,6 @@ const styles = StyleSheet.create({
   accountId: {
     fontSize: 11,
     color: "#666",
-    fontFamily: "monospace",
   },
   selectedBadge: {
     width: 28,

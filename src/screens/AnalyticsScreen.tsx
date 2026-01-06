@@ -1,7 +1,15 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+} from "react-native";
 import { useAppContext } from "../hooks/useAppContext";
 import EquityCurveChart from "../components/EquityCurveChart";
+import AccountDropdown from "../components/AccountDropdown";
 import WinRatePieChart from "../components/WinRatePieChart";
 import PerformanceByPairChart from "../components/PerformanceByPairChart";
 import {
@@ -13,14 +21,17 @@ import {
 
 export default function AnalyticsScreen() {
   const { state } = useAppContext();
-  const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month'>('all');
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [accountModalVisible, setAccountModalVisible] = useState<boolean>(false);
+  const [timeFilter, setTimeFilter] = useState<"all" | "week" | "month">("all");
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
+  const [accountModalVisible, setAccountModalVisible] =
+    useState<boolean>(false);
 
   const filteredTrades = React.useMemo(() => {
     const base = state.trades || [];
-    if (!selectedAccountId || selectedAccountId === 'all') return base;
-    return base.filter((t: any) => String(t.accountId || '') === String(selectedAccountId));
+    if (!selectedAccountId || selectedAccountId === "all") return base;
+    return base.filter(
+      (t: any) => String(t.accountId || "") === String(selectedAccountId)
+    );
   }, [state.trades, selectedAccountId]);
 
   const metrics = {
@@ -32,42 +43,47 @@ export default function AnalyticsScreen() {
   };
 
   const totalTrades = filteredTrades.length;
-  const winningTrades = filteredTrades.filter(t => t.result === 'Win').length;
-  const losingTrades = filteredTrades.filter(t => t.result === 'Loss').length;
+  const winningTrades = filteredTrades.filter((t) => t.result === "Win").length;
+  const losingTrades = filteredTrades.filter((t) => t.result === "Loss").length;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Analytics</Text>
           <Text style={styles.subtitle}>Performance insights & statistics</Text>
         </View>
-        <TouchableOpacity onPress={() => setAccountModalVisible(true)} style={{ padding: 8 }}>
-          <Text style={{ color: '#00d4d4', fontWeight: '700' }}>{selectedAccountId === 'all' ? 'All Accounts' : (state.accounts.find(a => a.id === selectedAccountId)?.name || 'Select Account')}</Text>
-        </TouchableOpacity>
       </View>
+
+      <AccountDropdown
+        accounts={state.accounts || []}
+        selectedAccountId={selectedAccountId}
+        onSelect={(id) => setSelectedAccountId(id)}
+        onAddAccount={() => setAccountModalVisible(true)}
+      />
 
       {/* Time Filter */}
       <View style={styles.filterContainer}>
         <View style={styles.filterGroup}>
           {[
-            { label: 'All Time', value: 'all' },
-            { label: 'This Week', value: 'week' },
-            { label: 'This Month', value: 'month' }
+            { label: "All Time", value: "all" },
+            { label: "This Week", value: "week" },
+            { label: "This Month", value: "month" },
           ].map((filter) => (
             <TouchableOpacity
               key={filter.value}
               style={[
                 styles.filterButton,
-                timeFilter === filter.value && styles.filterButtonActive
+                timeFilter === filter.value && styles.filterButtonActive,
               ]}
               onPress={() => setTimeFilter(filter.value as any)}
             >
-              <Text style={[
-                styles.filterButtonText,
-                timeFilter === filter.value && styles.filterButtonTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  timeFilter === filter.value && styles.filterButtonTextActive,
+                ]}
+              >
                 {filter.label}
               </Text>
             </TouchableOpacity>
@@ -79,51 +95,67 @@ export default function AnalyticsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Performance Overview</Text>
         <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, { borderColor: '#00d4d4' }]}>
+          <View style={[styles.metricCard, { borderColor: "#00d4d4" }]}>
             <View style={styles.metricIconContainer}>
-              <View style={[styles.metricIcon, { backgroundColor: '#00d4d420' }]}>
+              <View
+                style={[styles.metricIcon, { backgroundColor: "#00d4d420" }]}
+              >
                 <Text style={styles.metricIconText}>🎯</Text>
               </View>
             </View>
             <Text style={styles.metricLabel}>Win Rate</Text>
-            <Text style={[styles.metricValue, { color: '#00d4d4' }]}>
+            <Text style={[styles.metricValue, { color: "#00d4d4" }]}>
               {metrics.winRate.toFixed(1)}%
             </Text>
             <View style={styles.metricSubInfo}>
-              <Text style={styles.metricSubText}>{winningTrades}W / {losingTrades}L</Text>
-            </View>
-          </View>
-
-          <View style={[styles.metricCard, { borderColor: '#4caf50' }]}>
-            <View style={styles.metricIconContainer}>
-              <View style={[styles.metricIcon, { backgroundColor: '#4caf5020' }]}>
-                <Text style={styles.metricIconText}>📊</Text>
-              </View>
-            </View>
-            <Text style={styles.metricLabel}>Avg R:R</Text>
-            <Text style={[styles.metricValue, { color: '#4caf50' }]}>
-              1:{metrics.avgRR.toFixed(2)}
-            </Text>
-            <View style={styles.metricSubInfo}>
               <Text style={styles.metricSubText}>
-                {metrics.avgRR >= 2 ? 'Excellent' : metrics.avgRR >= 1.5 ? 'Good' : 'Needs work'}
+                {winningTrades}W / {losingTrades}L
               </Text>
             </View>
           </View>
 
-          <View style={[styles.metricCard, { borderColor: '#ffa500' }]}>
+          <View style={[styles.metricCard, { borderColor: "#4caf50" }]}>
             <View style={styles.metricIconContainer}>
-              <View style={[styles.metricIcon, { backgroundColor: '#ffa50020' }]}>
+              <View
+                style={[styles.metricIcon, { backgroundColor: "#4caf5020" }]}
+              >
+                <Text style={styles.metricIconText}>📊</Text>
+              </View>
+            </View>
+            <Text style={styles.metricLabel}>Avg R:R</Text>
+            <Text style={[styles.metricValue, { color: "#4caf50" }]}>
+              1:{metrics.avgRR.toFixed(2)}
+            </Text>
+            <View style={styles.metricSubInfo}>
+              <Text style={styles.metricSubText}>
+                {metrics.avgRR >= 2
+                  ? "Excellent"
+                  : metrics.avgRR >= 1.5
+                  ? "Good"
+                  : "Needs work"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.metricCard, { borderColor: "#ffa500" }]}>
+            <View style={styles.metricIconContainer}>
+              <View
+                style={[styles.metricIcon, { backgroundColor: "#ffa50020" }]}
+              >
                 <Text style={styles.metricIconText}>💰</Text>
               </View>
             </View>
-            <Text style={styles.metricLabel}>Profit Factor</Text>
-            <Text style={[styles.metricValue, { color: '#ffa500' }]}>
+            <Text style={styles.metricLabel}>Profit F</Text>
+            <Text style={[styles.metricValue, { color: "#ffa500" }]}>
               {metrics.profitFactor.toFixed(2)}
             </Text>
             <View style={styles.metricSubInfo}>
               <Text style={styles.metricSubText}>
-                {metrics.profitFactor >= 2 ? 'Strong' : metrics.profitFactor >= 1.5 ? 'Solid' : 'Weak'}
+                {metrics.profitFactor >= 2
+                  ? "Strong"
+                  : metrics.profitFactor >= 1.5
+                  ? "Solid"
+                  : "Weak"}
               </Text>
             </View>
           </View>
@@ -138,15 +170,18 @@ export default function AnalyticsScreen() {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: '#4caf50' }]}>
+          <Text style={[styles.summaryValue, { color: "#4caf50" }]}>
             {((winningTrades / totalTrades) * 100 || 0).toFixed(0)}%
           </Text>
           <Text style={styles.summaryLabel}>Win Rate</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: '#00d4d4' }]}>
-            {filteredTrades.filter(t => (t.grade || '').startsWith('A')).length}
+          <Text style={[styles.summaryValue, { color: "#00d4d4" }]}>
+            {
+              filteredTrades.filter((t) => (t.grade || "").startsWith("A"))
+                .length
+            }
           </Text>
           <Text style={styles.summaryLabel}>A+ Setups</Text>
         </View>
@@ -169,11 +204,15 @@ export default function AnalyticsScreen() {
             <Text style={styles.chartTitle}>Win/Loss Distribution</Text>
             <View style={styles.chartStats}>
               <View style={styles.chartStatItem}>
-                <View style={[styles.chartStatDot, { backgroundColor: '#4caf50' }]} />
+                <View
+                  style={[styles.chartStatDot, { backgroundColor: "#4caf50" }]}
+                />
                 <Text style={styles.chartStatText}>{winningTrades} Wins</Text>
               </View>
               <View style={styles.chartStatItem}>
-                <View style={[styles.chartStatDot, { backgroundColor: '#f44336' }]} />
+                <View
+                  style={[styles.chartStatDot, { backgroundColor: "#f44336" }]}
+                />
                 <Text style={styles.chartStatText}>{losingTrades} Losses</Text>
               </View>
             </View>
@@ -196,18 +235,25 @@ export default function AnalyticsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Session Performance</Text>
-          <Text style={styles.sectionSubtitle}>Win rate by trading session</Text>
+          <Text style={styles.sectionSubtitle}>
+            Win rate by trading session
+          </Text>
         </View>
-        
+
         <View style={styles.sessionGrid}>
           {Object.entries(metrics.performanceBySession).map(
             ([session, winRate]) => {
-              const sessionTrades = filteredTrades.filter(t => t.session === session).length;
-              const sessionIcon = session === 'London' ? '🇬🇧' : session === 'NY' ? '🇺🇸' : '🌏';
-              const performanceColor = 
-                winRate >= 60 ? '#4caf50' : 
-                winRate >= 40 ? '#00d4d4' : 
-                '#f44336';
+              const sessionTrades = filteredTrades.filter(
+                (t) => t.session === session
+              ).length;
+              const sessionIcon =
+                session === "London" ? "🇬🇧" : session === "NY" ? "🇺🇸" : "🌏";
+              const performanceColor =
+                winRate >= 60
+                  ? "#4caf50"
+                  : winRate >= 40
+                  ? "#00d4d4"
+                  : "#f44336";
 
               return (
                 <View key={session} style={styles.sessionCard}>
@@ -216,33 +262,49 @@ export default function AnalyticsScreen() {
                       <Text style={styles.sessionIcon}>{sessionIcon}</Text>
                       <View>
                         <Text style={styles.sessionName}>{session}</Text>
-                        <Text style={styles.sessionTrades}>{sessionTrades} trades</Text>
+                        <Text style={styles.sessionTrades}>
+                          {sessionTrades} trades
+                        </Text>
                       </View>
                     </View>
-                    <View style={[styles.sessionBadge, { backgroundColor: `${performanceColor}20` }]}>
-                      <Text style={[styles.sessionBadgeText, { color: performanceColor }]}>
+                    <View
+                      style={[
+                        styles.sessionBadge,
+                        { backgroundColor: `${performanceColor}20` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.sessionBadgeText,
+                          { color: performanceColor },
+                        ]}
+                      >
                         {winRate.toFixed(0)}%
                       </Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.progressBarContainer}>
                     <View style={styles.progressBar}>
-                      <View 
+                      <View
                         style={[
-                          styles.progressFill, 
-                          { 
+                          styles.progressFill,
+                          {
                             width: `${Math.min(winRate, 100)}%`,
-                            backgroundColor: performanceColor
-                          }
-                        ]} 
+                            backgroundColor: performanceColor,
+                          },
+                        ]}
                       />
                     </View>
                   </View>
 
                   <View style={styles.sessionFooter}>
                     <Text style={styles.sessionFooterText}>
-                      {winRate >= 60 ? '🔥 Hot' : winRate >= 40 ? '✓ Solid' : '⚠️ Focus Area'}
+                      {winRate >= 60
+                        ? "🔥 Hot"
+                        : winRate >= 40
+                        ? "✓ Solid"
+                        : "⚠️ Focus Area"}
                     </Text>
                   </View>
                 </View>
@@ -256,7 +318,9 @@ export default function AnalyticsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pair Performance</Text>
-          <Text style={styles.sectionSubtitle}>Best & worst performing pairs</Text>
+          <Text style={styles.sectionSubtitle}>
+            Best & worst performing pairs
+          </Text>
         </View>
 
         <View style={styles.pairList}>
@@ -264,12 +328,17 @@ export default function AnalyticsScreen() {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
             .map(([pair, winRate], index) => {
-              const pairTrades = filteredTrades.filter(t => t.pair === pair).length;
-              const rankColor = 
-                index === 0 ? '#ffd700' : 
-                index === 1 ? '#c0c0c0' : 
-                index === 2 ? '#cd7f32' : 
-                '#666';
+              const pairTrades = filteredTrades.filter(
+                (t) => t.pair === pair
+              ).length;
+              const rankColor =
+                index === 0
+                  ? "#ffd700"
+                  : index === 1
+                  ? "#c0c0c0"
+                  : index === 2
+                  ? "#cd7f32"
+                  : "#666";
 
               return (
                 <View key={pair} style={styles.pairRow}>
@@ -278,7 +347,7 @@ export default function AnalyticsScreen() {
                       #{index + 1}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.pairInfo}>
                     <Text style={styles.pairName}>{pair}</Text>
                     <Text style={styles.pairTrades}>{pairTrades} trades</Text>
@@ -286,23 +355,26 @@ export default function AnalyticsScreen() {
 
                   <View style={styles.pairProgress}>
                     <View style={styles.pairProgressBar}>
-                      <View 
+                      <View
                         style={[
                           styles.pairProgressFill,
-                          { 
+                          {
                             width: `${Math.min(winRate, 100)}%`,
-                            backgroundColor: winRate >= 50 ? '#4caf50' : '#f44336'
-                          }
-                        ]} 
+                            backgroundColor:
+                              winRate >= 50 ? "#4caf50" : "#f44336",
+                          },
+                        ]}
                       />
                     </View>
                   </View>
 
                   <View style={styles.pairValue}>
-                    <Text style={[
-                      styles.pairValueText,
-                      { color: winRate >= 50 ? '#4caf50' : '#f44336' }
-                    ]}>
+                    <Text
+                      style={[
+                        styles.pairValueText,
+                        { color: winRate >= 50 ? "#4caf50" : "#f44336" },
+                      ]}
+                    >
                       {winRate.toFixed(0)}%
                     </Text>
                   </View>
@@ -320,8 +392,9 @@ export default function AnalyticsScreen() {
             <Text style={styles.insightIcon}>⚡</Text>
             <Text style={styles.insightTitle}>Best Session</Text>
             <Text style={styles.insightValue}>
-              {Object.entries(metrics.performanceBySession)
-                .sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A'}
+              {Object.entries(metrics.performanceBySession).sort(
+                ([, a], [, b]) => b - a
+              )[0]?.[0] || "N/A"}
             </Text>
           </View>
 
@@ -329,8 +402,9 @@ export default function AnalyticsScreen() {
             <Text style={styles.insightIcon}>🎯</Text>
             <Text style={styles.insightTitle}>Best Pair</Text>
             <Text style={styles.insightValue}>
-              {Object.entries(metrics.performanceByPair)
-                .sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A'}
+              {Object.entries(metrics.performanceByPair).sort(
+                ([, a], [, b]) => b - a
+              )[0]?.[0] || "N/A"}
             </Text>
           </View>
 
@@ -341,7 +415,7 @@ export default function AnalyticsScreen() {
               {(() => {
                 let streak = 0;
                 for (let i = filteredTrades.length - 1; i >= 0; i--) {
-                  if (filteredTrades[i].result === 'Win') streak++;
+                  if (filteredTrades[i].result === "Win") streak++;
                   else break;
                 }
                 return `${streak}W`;
@@ -352,26 +426,7 @@ export default function AnalyticsScreen() {
       </View>
 
       <View style={{ height: 40 }} />
-      <Modal visible={accountModalVisible} animationType="slide" transparent onRequestClose={() => setAccountModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#0d0d0d', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#f5f5f5', fontWeight: '700', fontSize: 16, marginBottom: 12 }}>Select Account</Text>
-            <ScrollView style={{ maxHeight: 400 }}>
-              <TouchableOpacity onPress={() => { setSelectedAccountId('all'); setAccountModalVisible(false); }} style={{ padding: 12 }}>
-                <Text style={{ color: '#00d4d4' }}>All Accounts</Text>
-              </TouchableOpacity>
-              {(state.accounts || []).map((acc) => (
-                <TouchableOpacity key={acc.id} onPress={() => { setSelectedAccountId(acc.id); setAccountModalVisible(false); }} style={{ padding: 12 }}>
-                  <Text style={{ color: '#f5f5f5' }}>{acc.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity onPress={() => setAccountModalVisible(false)} style={{ padding: 12, alignItems: 'center' }}>
-              <Text style={{ color: '#aaa' }}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Account modal replaced with AccountDropdown above */}
     </ScrollView>
   );
 }
@@ -402,30 +457,30 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   filterGroup: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   filterButton: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: "#444",
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   filterButtonActive: {
-    backgroundColor: '#00d4d420',
-    borderColor: '#00d4d4',
+    backgroundColor: "#00d4d420",
+    borderColor: "#00d4d4",
   },
   filterButtonText: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterButtonTextActive: {
-    color: '#00d4d4',
+    color: "#00d4d4",
   },
   section: {
     marginBottom: 24,
@@ -440,7 +495,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionSubtitle: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 13,
   },
   metricsGrid: {
@@ -462,8 +517,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   metricIconText: {
     fontSize: 24,
@@ -472,7 +527,7 @@ const styles = StyleSheet.create({
     color: "#aaa",
     fontSize: 11,
     fontWeight: "600",
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 8,
   },
@@ -482,85 +537,85 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   metricSubInfo: {
-    backgroundColor: 'rgba(0, 212, 212, 0.1)',
+    backgroundColor: "rgba(0, 212, 212, 0.1)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
     marginTop: 4,
   },
   metricSubText: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   summaryBar: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
+    flexDirection: "row",
+    backgroundColor: "#1a1a1a",
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.1)',
+    borderColor: "rgba(0, 212, 212, 0.1)",
   },
   summaryItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   summaryValue: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 4,
   },
   summaryLabel: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   summaryDivider: {
     width: 1,
-    backgroundColor: 'rgba(0, 212, 212, 0.15)',
+    backgroundColor: "rgba(0, 212, 212, 0.15)",
     marginHorizontal: 12,
   },
   chartCard: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.1)',
+    borderColor: "rgba(0, 212, 212, 0.1)",
   },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   chartTitle: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   chartBadge: {
-    backgroundColor: 'rgba(0, 212, 212, 0.15)',
+    backgroundColor: "rgba(0, 212, 212, 0.15)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   chartBadgeText: {
-    color: '#00d4d4',
+    color: "#00d4d4",
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   chartStats: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   chartStatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   chartStatDot: {
@@ -569,49 +624,49 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   chartStatText: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   chartAction: {
     paddingVertical: 4,
   },
   chartActionText: {
-    color: '#00d4d4',
+    color: "#00d4d4",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   sessionGrid: {
     gap: 12,
   },
   sessionCard: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.15)',
+    borderColor: "rgba(0, 212, 212, 0.15)",
   },
   sessionCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   sessionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   sessionIcon: {
     fontSize: 32,
   },
   sessionName: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   sessionTrades: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 12,
     marginTop: 2,
   },
@@ -622,7 +677,7 @@ const styles = StyleSheet.create({
   },
   sessionBadgeText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   progressBarContainer: {
     marginBottom: 8,
@@ -641,97 +696,97 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sessionFooterText: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   pairList: {
     gap: 12,
   },
   pairRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
     borderRadius: 12,
     padding: 14,
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.1)',
+    borderColor: "rgba(0, 212, 212, 0.1)",
   },
   pairRank: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
   },
   pairRankText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   pairInfo: {
     flex: 1,
   },
   pairName: {
-    color: '#f5f5f5',
+    color: "#f5f5f5",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 2,
   },
   pairTrades: {
-    color: '#666',
+    color: "#666",
     fontSize: 11,
   },
   pairProgress: {
     flex: 2,
   },
   pairProgressBar: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
     height: 6,
     borderRadius: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   pairProgressFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 3,
   },
   pairValue: {
     width: 50,
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   pairValueText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   insightsGrid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   insightCard: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.1)',
+    borderColor: "rgba(0, 212, 212, 0.1)",
   },
   insightIcon: {
     fontSize: 32,
     marginBottom: 8,
   },
   insightTitle: {
-    color: '#aaa',
+    color: "#aaa",
     fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   insightValue: {
-    color: '#00d4d4',
+    color: "#00d4d4",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

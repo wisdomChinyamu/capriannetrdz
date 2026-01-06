@@ -10,6 +10,7 @@ export interface AppState {
   error: string | null;
   routines: Routine[]; // Add routines property
   accounts: TradingAccount[]; // Add accounts property
+  uiScale: 'small' | 'normal' | 'large';
 }
 
 export type AppAction =
@@ -27,7 +28,8 @@ export type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_ROUTINES'; payload: Routine[] } // Add SET_ROUTINES action
-  | { type: 'SET_ACCOUNTS'; payload: TradingAccount[] }; // Add SET_ACCOUNTS action
+  | { type: 'SET_ACCOUNTS'; payload: TradingAccount[] } // Add SET_ACCOUNTS action
+  | { type: 'SET_UI_SCALE'; payload: 'small' | 'normal' | 'large' };
 
 const initialState: AppState = {
   user: null,
@@ -38,6 +40,7 @@ const initialState: AppState = {
   error: null,
   routines: [], // Initialize routines
   accounts: [], // Initialize accounts
+  uiScale: 'normal',
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -103,6 +106,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, routines: action.payload };
     case 'SET_ACCOUNTS': // Handle SET_ACCOUNTS action
       return { ...state, accounts: action.payload };
+    case 'SET_UI_SCALE':
+      return { ...state, uiScale: action.payload };
     default:
       return state;
   }

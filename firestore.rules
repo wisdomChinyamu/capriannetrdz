@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to access only their own data
+    // Users collection - for user profiles
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Accounts collection - users can only access their own accounts
+    match /accounts/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new accounts, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Trades collection - users can only access their own trades
+    match /trades/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new trades, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Strategies collection - users can only access their own strategies
+    match /strategies/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new strategies, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Checklist template collection - users can only access their own template
+    match /checklist_template/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new templates, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Psychology logs collection - users can only access their own logs
+    match /psychology_logs/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new logs, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Routines collection - users can only access their own routines
+    match /routines/{document} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == resource.data.userId;
+      // For creating new routines, allow if the userId matches the authenticated user
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Transactions collection - users can only access their own transactions
+    match /transactions/{document} {
+      // Allow read/write when the authenticated user is either the transaction owner
+      // OR the transaction references an account that belongs to the authenticated user.
+      allow read, write: if request.auth != null
+        && (
+          // transaction has explicit userId field matching the requester
+          (resource.data.userId != null && request.auth.uid == resource.data.userId)
+          // OR the account referenced in the transaction belongs to the requester
+          || (resource.data.accountId != null && isValidAccountTransaction(request.auth.uid, resource.data.accountId))
+        );
+      // For creating new transactions, require the authenticated user to be the declared user
+      // or to own the account being referenced in the new transaction payload.
+      allow create: if request.auth != null
+        && (
+          (request.resource.data.userId != null && request.auth.uid == request.resource.data.userId)
+          || (request.resource.data.accountId != null && isValidAccountTransaction(request.auth.uid, request.resource.data.accountId))
+        );
+    }
+    
+    // Helper function to verify the user has access to the account referenced in the transaction
+    function isValidAccountTransaction(userId, accountId) {
+      // Check if the account exists and belongs to the user
+      return exists(/databases/{database}/documents/accounts/$(accountId)) 
+        && get(/databases/{database}/documents/accounts/$(accountId)).data.userId == userId;
+    }
+  }
+}

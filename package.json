@@ -11,7 +11,9 @@
     "web:dev": "expo start --web --dev"
   },
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.3.0",
     "@expo/metro-runtime": "~3.2.3",
+    "@react-native-community/datetimepicker": "8.0.1",
     "@react-navigation/bottom-tabs": "^6.5.8",
     "@react-navigation/native": "^6.1.7",
     "@react-navigation/native-stack": "^6.9.13",
@@ -23,7 +25,7 @@
     "crypto-js": "^4.2.0",
     "expo": "~51.0.0",
     "expo-font": "~12.0.0",
-    "expo-image-picker": "~15.0.7",
+    "expo-image-picker": "~15.1.0",
     "expo-status-bar": "~1.12.0",
     "firebase": "^11.10.0",
     "framer-motion": "^11.13.5",
@@ -43,6 +45,7 @@
     "vm-browserify": "^1.1.2"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "@types/react": "~18.2.79",
     "@types/react-native": "^0.73.0",
     "nativewind": "^4.1.2",

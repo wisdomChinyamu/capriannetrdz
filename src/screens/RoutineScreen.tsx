@@ -1,36 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
   TouchableOpacity,
   Alert,
   Platform,
-  TextInput
-} from 'react-native';
-import { useAppContext } from '../hooks/useAppContext';
-import { useTheme } from '../components/ThemeProvider';
-import { 
-  createRoutine, 
-  updateRoutine, 
-  deleteRoutine, 
-  addRoutineItem, 
-  updateRoutineItem, 
-  deleteRoutineItem, 
+  TextInput,
+} from "react-native";
+import { useAppContext } from "../hooks/useAppContext";
+import { useTheme } from "../components/ThemeProvider";
+import {
+  createRoutine,
+  updateRoutine,
+  deleteRoutine,
+  addRoutineItem,
+  updateRoutineItem,
+  deleteRoutineItem,
   completeRoutine,
-  getRoutines
-} from '../services/firebaseService';
-import { Routine, RoutineItem } from '../types';
+  getRoutines,
+  isScheduledDay,
+  countScheduledDaysBetween,
+} from "../services/firebaseService";
+import { Routine, RoutineItem } from "../types";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function RoutineScreen() {
   const { colors } = useTheme();
   const { state, dispatch } = useAppContext();
   const [activeRoutine, setActiveRoutine] = useState<Routine | null>(null);
-  const [newRoutineName, setNewRoutineName] = useState('');
+  const [newRoutineName, setNewRoutineName] = useState("");
   const [showNewRoutineForm, setShowNewRoutineForm] = useState(false);
-  const [newItemText, setNewItemText] = useState('');
-  const [selectedSchedule, setSelectedSchedule] = useState<'weekday' | 'weekend' | 'both'>('both');
+  const [newItemText, setNewItemText] = useState("");
+  const [selectedSchedule, setSelectedSchedule] = useState<
+    "weekday" | "weekend" | "both"
+  >("both");
   const [loading, setLoading] = useState(false);
 
   // Load routines when component mounts
@@ -40,10 +45,13 @@ export default function RoutineScreen() {
         try {
           setLoading(true);
           const routines = await getRoutines(state.user.uid);
-          dispatch({ type: 'SET_ROUTINES', payload: routines });
+          dispatch({ type: "SET_ROUTINES", payload: routines });
         } catch (error) {
-          console.error('Error loading routines:', error);
-          Alert.alert('Error', 'Failed to load routines: ' + (error as Error).message);
+          console.error("Error loading routines:", error);
+          Alert.alert(
+            "Error",
+            "Failed to load routines: " + (error as Error).message
+          );
         } finally {
           setLoading(false);
         }
@@ -57,62 +65,116 @@ export default function RoutineScreen() {
   const getFilteredRoutines = () => {
     const today = new Date();
     const isWeekend = today.getDay() === 0 || today.getDay() === 6; // Sunday=0, Saturday=6
-    
-    return state.routines.filter(routine => {
-      if (routine.schedule === 'both') return true;
-      if (routine.schedule === 'weekday' && !isWeekend) return true;
-      if (routine.schedule === 'weekend' && isWeekend) return true;
+
+    return state.routines.filter((routine) => {
+      if (routine.schedule === "both") return true;
+      if (routine.schedule === "weekday" && !isWeekend) return true;
+      if (routine.schedule === "weekend" && isWeekend) return true;
       return false;
     });
   };
 
   // Set the first routine as active when routines load
   useEffect(() => {
-    if (state.routines.length > 0 && !activeRoutine) {
+    const filtered = getFilteredRoutines();
+    if (filtered.length > 0 && !activeRoutine) {
+      setActiveRoutine(filtered[0]);
+    } else if (!activeRoutine && state.routines.length > 0) {
+      // Fallback to first routine if no filtered routines available
       setActiveRoutine(state.routines[0]);
     }
   }, [state.routines]);
 
-  // Reset completed items at midnight
+  // Reset completed items at midnight and handle streak logic
   useEffect(() => {
     const checkAndResetDailyItems = async () => {
       if (!activeRoutine) return;
-      
-      // Check if we need to reset items (if last completed was yesterday or earlier)
-      const now = new Date();
-      const lastCompleted = activeRoutine.lastCompleted ? new Date(activeRoutine.lastCompleted) : null;
-      
-      if (!lastCompleted || 
-          lastCompleted.getDate() !== now.getDate() || 
-          lastCompleted.getMonth() !== now.getMonth() || 
-          lastCompleted.getFullYear() !== now.getFullYear()) {
-        
-        // Reset all completed items
-        try {
-          for (const item of activeRoutine.items) {
-            if (item.completed) {
-              await updateRoutineItem(activeRoutine.id, item.id, {
-                completed: false,
-                completedAt: null,
-              });
+
+      // Check scheduled-day-aware missed days and reset streak if required
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lastCompleted = activeRoutine.lastCompleted
+        ? new Date(activeRoutine.lastCompleted)
+        : null;
+
+      if (lastCompleted) {
+        const lastCompDate = new Date(lastCompleted);
+        lastCompDate.setHours(0, 0, 0, 0);
+
+        const scheduledMissed = countScheduledDaysBetween(
+          lastCompDate,
+          today,
+          activeRoutine.schedule
+        );
+
+        // If user missed one or more scheduled days (per the routine schedule), reset streak
+        if (scheduledMissed > 1) {
+          try {
+            await updateRoutine(activeRoutine.id, {
+              streak: 0,
+              lastCompleted: lastCompDate,
+            });
+
+            // Refresh routines and update active routine
+            if (state.user?.uid) {
+              const routines = await getRoutines(state.user.uid);
+              dispatch({ type: "SET_ROUTINES", payload: routines });
+              const updatedRoutine = routines.find(
+                (r) => r.id === activeRoutine.id
+              );
+              if (updatedRoutine) setActiveRoutine(updatedRoutine);
             }
+          } catch (error) {
+            console.error("Error resetting streak:", error);
           }
-          
-          // Refresh routines
-          if (state.user?.uid) {
-            const routines = await getRoutines(state.user.uid);
-            dispatch({ type: 'SET_ROUTINES', payload: routines });
-            
-            // Update active routine
-            const updatedRoutine = routines.find(r => r.id === activeRoutine.id);
-            if (updatedRoutine) {
-              setActiveRoutine(updatedRoutine);
-            }
-          }
-        } catch (error) {
-          console.error('Error resetting daily routine items:', error);
         }
       }
+
+      // Reset completed items at start of a new scheduled day so the checklist refreshes
+      try {
+        const isTodayScheduled = isScheduledDay(
+          new Date(),
+          activeRoutine.schedule
+        );
+        const lastCompletedDate = activeRoutine.lastCompleted
+          ? new Date(activeRoutine.lastCompleted)
+          : null;
+
+        // Only consider 'before today' if there was a recorded lastCompleted date
+        const lastCompletedBeforeToday =
+          lastCompletedDate &&
+          new Date(lastCompletedDate).setHours(0, 0, 0, 0) < today.getTime();
+
+        if (isTodayScheduled && lastCompletedBeforeToday) {
+          // If any items are still marked completed from previous day, reset them for today
+          const anyCompleted = activeRoutine.items.some((i) => i.completed);
+          if (anyCompleted) {
+            const resetItems = activeRoutine.items.map((it) => ({
+              ...it,
+              completed: false,
+              completedAt: null,
+            }));
+            await updateRoutine(activeRoutine.id, { items: resetItems });
+
+            // Refresh routines and update active routine
+            if (state.user?.uid) {
+              const routines = await getRoutines(state.user.uid);
+              dispatch({ type: "SET_ROUTINES", payload: routines });
+              const updatedRoutine = routines.find(
+                (r) => r.id === activeRoutine.id
+              );
+              if (updatedRoutine) setActiveRoutine(updatedRoutine);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error resetting daily items:", e);
+      }
+
+      // NOTE: Removed automatic per-item reset to prevent individual item
+      // toggles from reverting. Items now persist when toggled. Daily
+      // resets should be handled explicitly (server-side or via a separate
+      // flag) to avoid overwriting user interactions.
     };
 
     // Check on component mount and when active routine changes
@@ -120,92 +182,103 @@ export default function RoutineScreen() {
 
     // Set up interval to check every hour
     const interval = setInterval(checkAndResetDailyItems, 60 * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, [activeRoutine, state.user?.uid, dispatch]);
 
-  const handleCreateRoutine = async () => {
-    if (!newRoutineName.trim()) {
-      Alert.alert('Error', 'Please enter a routine name');
-      return;
-    }
+  // Confirm modal state for deletion
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = React.useState(false);
+  const [routineToDelete, setRoutineToDelete] = React.useState<string | null>(
+    null
+  );
 
+  const openDeleteRoutineConfirm = async (routineId?: string) => {
+    setRoutineToDelete(routineId || null);
+    setConfirmDeleteVisible(true);
+  };
+
+  const performDeleteRoutine = async () => {
+    if (!routineToDelete) return;
     try {
-      if (!state.user?.uid) {
-        throw new Error('User not authenticated');
+      setLoading(true);
+      await deleteRoutine(routineToDelete);
+
+      // Refresh routines
+      if (state.user?.uid) {
+        const routines = await getRoutines(state.user.uid);
+        dispatch({ type: "SET_ROUTINES", payload: routines });
+
+        // If we deleted the active routine, set a new one
+        if (activeRoutine?.id === routineToDelete) {
+          setActiveRoutine(routines.length > 0 ? routines[0] : null);
+        }
       }
 
-      setLoading(true);
-      const routineId = await createRoutine(state.user.uid, newRoutineName, selectedSchedule);
-      
-      // Refresh routines
-      const routines = await getRoutines(state.user.uid);
-      dispatch({ type: 'SET_ROUTINES', payload: routines });
-      
-      // Set as active routine
-      const newRoutine = routines.find(r => r.id === routineId);
-      if (newRoutine) {
-        setActiveRoutine(newRoutine);
-      }
-      
-      // Reset form
-      setNewRoutineName('');
-      setShowNewRoutineForm(false);
-      Alert.alert('Success', 'Routine created successfully');
+      setConfirmDeleteVisible(false);
+      setRoutineToDelete(null);
+      Alert.alert("Success", "Routine deleted successfully");
     } catch (error) {
-      console.error('Error creating routine:', error);
-      Alert.alert('Error', 'Failed to create routine: ' + (error as Error).message);
+      console.error("Error deleting routine:", error);
+      Alert.alert(
+        "Error",
+        "Failed to delete routine: " + (error as Error).message
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteRoutine = async (routineId: string) => {
-    Alert.alert(
-      'Delete Routine',
-      'Are you sure you want to delete this routine? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await deleteRoutine(routineId);
-              
-              // Refresh routines
-              if (state.user?.uid) {
-                const routines = await getRoutines(state.user.uid);
-                dispatch({ type: 'SET_ROUTINES', payload: routines });
-                
-                // If we deleted the active routine, set a new one
-                if (activeRoutine?.id === routineId) {
-                  setActiveRoutine(routines.length > 0 ? routines[0] : null);
-                }
-              }
-              
-              Alert.alert('Success', 'Routine deleted successfully');
-            } catch (error) {
-              console.error('Error deleting routine:', error);
-              Alert.alert('Error', 'Failed to delete routine: ' + (error as Error).message);
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+  const handleCreateRoutine = async () => {
+    if (!newRoutineName.trim()) {
+      Alert.alert("Error", "Please enter a routine name");
+      return;
+    }
+
+    try {
+      if (!state.user?.uid) {
+        throw new Error("User not authenticated");
+      }
+
+      setLoading(true);
+      const routineId = await createRoutine(
+        state.user.uid,
+        newRoutineName,
+        selectedSchedule
+      );
+
+      // Refresh routines
+      const routines = await getRoutines(state.user.uid);
+      dispatch({ type: "SET_ROUTINES", payload: routines });
+
+      // Set as active routine
+      const newRoutine = routines.find((r) => r.id === routineId);
+      if (newRoutine) {
+        setActiveRoutine(newRoutine);
+      }
+
+      // Reset form
+      setNewRoutineName("");
+      setShowNewRoutineForm(false);
+      Alert.alert("Success", "Routine created successfully");
+    } catch (error) {
+      console.error("Error creating routine:", error);
+      Alert.alert(
+        "Error",
+        "Failed to create routine: " + (error as Error).message
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddItem = async () => {
     if (!newItemText.trim()) {
-      Alert.alert('Error', 'Please enter an item');
+      Alert.alert("Error", "Please enter an item");
       return;
     }
 
     if (!activeRoutine) {
-      Alert.alert('Error', 'No active routine selected');
+      Alert.alert("Error", "No active routine selected");
       return;
     }
 
@@ -213,27 +286,27 @@ export default function RoutineScreen() {
       setLoading(true);
       await addRoutineItem(activeRoutine.id, {
         label: newItemText,
-        category: 'Optional',
+        category: "Optional",
         completed: false,
       });
-      
+
       // Refresh routines
       if (state.user?.uid) {
         const routines = await getRoutines(state.user.uid);
-        dispatch({ type: 'SET_ROUTINES', payload: routines });
-        
+        dispatch({ type: "SET_ROUTINES", payload: routines });
+
         // Update active routine
-        const updatedRoutine = routines.find(r => r.id === activeRoutine.id);
+        const updatedRoutine = routines.find((r) => r.id === activeRoutine.id);
         if (updatedRoutine) {
           setActiveRoutine(updatedRoutine);
         }
       }
-      
+
       // Reset form
-      setNewItemText('');
+      setNewItemText("");
     } catch (error) {
-      console.error('Error adding routine item:', error);
-      Alert.alert('Error', 'Failed to add item: ' + (error as Error).message);
+      console.error("Error adding routine item:", error);
+      Alert.alert("Error", "Failed to add item: " + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -244,28 +317,32 @@ export default function RoutineScreen() {
 
     try {
       setLoading(true);
-      const item = activeRoutine.items.find(i => i.id === itemId);
+      const item = activeRoutine.items.find((i) => i.id === itemId);
       if (!item) return;
 
+      // Update the item completion status
       await updateRoutineItem(activeRoutine.id, itemId, {
         completed: !item.completed,
         completedAt: !item.completed ? new Date() : null,
       });
-      
+
       // Refresh routines
       if (state.user?.uid) {
         const routines = await getRoutines(state.user.uid);
-        dispatch({ type: 'SET_ROUTINES', payload: routines });
-        
+        dispatch({ type: "SET_ROUTINES", payload: routines });
+
         // Update active routine
-        const updatedRoutine = routines.find(r => r.id === activeRoutine.id);
+        const updatedRoutine = routines.find((r) => r.id === activeRoutine.id);
         if (updatedRoutine) {
           setActiveRoutine(updatedRoutine);
         }
       }
     } catch (error) {
-      console.error('Error toggling routine item:', error);
-      Alert.alert('Error', 'Failed to update item: ' + (error as Error).message);
+      console.error("Error toggling routine item:", error);
+      Alert.alert(
+        "Error",
+        "Failed to update item: " + (error as Error).message
+      );
     } finally {
       setLoading(false);
     }
@@ -277,32 +354,37 @@ export default function RoutineScreen() {
     try {
       setLoading(true);
       await completeRoutine(activeRoutine.id);
-      
+
       // Refresh routines
       if (state.user?.uid) {
         const routines = await getRoutines(state.user.uid);
-        dispatch({ type: 'SET_ROUTINES', payload: routines });
-        
+        dispatch({ type: "SET_ROUTINES", payload: routines });
+
         // Update active routine
-        const updatedRoutine = routines.find(r => r.id === activeRoutine.id);
+        const updatedRoutine = routines.find((r) => r.id === activeRoutine.id);
         if (updatedRoutine) {
           setActiveRoutine(updatedRoutine);
         }
       }
-      
-      Alert.alert('Success', 'Routine completed! Streak increased.');
+
+      Alert.alert("Success", "Routine completed! Streak increased.");
     } catch (error) {
-      console.error('Error completing routine:', error);
-      Alert.alert('Error', 'Failed to complete routine: ' + (error as Error).message);
+      console.error("Error completing routine:", error);
+      Alert.alert(
+        "Error",
+        "Failed to complete routine: " + (error as Error).message
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const filteredRoutines = getFilteredRoutines();
-  const completedItems = activeRoutine?.items.filter(item => item.completed).length || 0;
+  const completedItems =
+    activeRoutine?.items.filter((item) => item.completed).length || 0;
   const totalItems = activeRoutine?.items.length || 0;
-  const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+  const completionPercentage =
+    totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -319,28 +401,44 @@ export default function RoutineScreen() {
       </View>
 
       {loading && (
-        <View style={[styles.loadingOverlay, { backgroundColor: `${colors.background}CC` }]}>
-          <Text style={[styles.loadingText, { color: colors.text }]}>Saving...</Text>
+        <View
+          style={[
+            styles.loadingOverlay,
+            { backgroundColor: `${colors.background}CC` },
+          ]}
+        >
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Saving...
+          </Text>
         </View>
       )}
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Streak Banner */}
         {activeRoutine && (
-          <View style={[styles.streakBanner, { backgroundColor: colors.surface }]}>
+          <View
+            style={[styles.streakBanner, { backgroundColor: colors.surface }]}
+          >
             <View style={styles.streakContent}>
               <Text style={[styles.streakEmoji]}>🔥</Text>
               <View>
-                <Text style={[styles.streakLabel, { color: colors.subtext }]}>Current Streak</Text>
-                <Text style={[styles.streakValue, { color: colors.highlight }]}>{activeRoutine.streak} days</Text>
+                <Text style={[styles.streakLabel, { color: colors.subtext }]}>
+                  Current Streak
+                </Text>
+                <Text style={[styles.streakValue, { color: colors.highlight }]}>
+                  {activeRoutine.streak} days
+                </Text>
               </View>
             </View>
-            <TouchableOpacity 
-              style={[styles.completeButton, { backgroundColor: colors.highlight }]}
+            <TouchableOpacity
+              style={[
+                styles.completeButton,
+                { backgroundColor: colors.highlight },
+              ]}
               onPress={handleCompleteRoutine}
               disabled={loading}
             >
@@ -351,60 +449,96 @@ export default function RoutineScreen() {
 
         {/* Routine Selector */}
         <View style={styles.routineSelector}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Routines</Text>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.routineTabs}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Your Routines
+          </Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.routineTabs}
+          >
             {filteredRoutines.map((routine) => (
               <TouchableOpacity
                 key={routine.id}
                 style={[
                   styles.routineTab,
                   activeRoutine?.id === routine.id && styles.activeRoutineTab,
-                  { 
-                    backgroundColor: activeRoutine?.id === routine.id ? colors.highlight : colors.surface,
-                    borderColor: activeRoutine?.id === routine.id ? colors.highlight : colors.neutral,
-                  }
+                  {
+                    backgroundColor:
+                      activeRoutine?.id === routine.id
+                        ? colors.highlight
+                        : colors.surface,
+                    borderColor:
+                      activeRoutine?.id === routine.id
+                        ? colors.highlight
+                        : colors.neutral,
+                  },
                 ]}
                 onPress={() => setActiveRoutine(routine)}
                 disabled={loading}
               >
-                <Text 
+                <Text
                   style={[
                     styles.routineTabText,
-                    { color: activeRoutine?.id === routine.id ? '#000' : colors.text }
+                    {
+                      color:
+                        activeRoutine?.id === routine.id ? "#000" : colors.text,
+                    },
                   ]}
                 >
                   {routine.name}
                 </Text>
-                <Text 
+                <Text
                   style={[
                     styles.routineStreak,
-                    { color: activeRoutine?.id === routine.id ? '#000' : colors.subtext }
+                    {
+                      color:
+                        activeRoutine?.id === routine.id
+                          ? "#000"
+                          : colors.subtext,
+                    },
                   ]}
                 >
                   🔥 {routine.streak}
                 </Text>
               </TouchableOpacity>
             ))}
-            
+
             <TouchableOpacity
-              style={[styles.newRoutineButton, { backgroundColor: colors.surface }]}
+              style={[
+                styles.newRoutineButton,
+                { backgroundColor: colors.surface },
+              ]}
               onPress={() => setShowNewRoutineForm(true)}
               disabled={loading}
             >
-              <Text style={[styles.newRoutineText, { color: colors.text }]}>+ New Routine</Text>
+              <Text style={[styles.newRoutineText, { color: colors.text }]}>
+                + New Routine
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
 
         {/* New Routine Form */}
         {showNewRoutineForm && (
-          <View style={[styles.newRoutineForm, { backgroundColor: colors.card }]}>
-            <Text style={[styles.formTitle, { color: colors.text }]}>Create New Routine</Text>
-            
+          <View
+            style={[styles.newRoutineForm, { backgroundColor: colors.card }]}
+          >
+            <Text style={[styles.formTitle, { color: colors.text }]}>
+              Create New Routine
+            </Text>
+
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Routine Name</Text>
-              <View style={[styles.inputContainer, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Routine Name
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: colors.surface },
+                ]}
+              >
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="Morning Routine, Evening Review..."
@@ -415,28 +549,42 @@ export default function RoutineScreen() {
                 />
               </View>
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Schedule</Text>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Schedule
+              </Text>
               <View style={styles.scheduleOptions}>
-                {(['weekday', 'weekend', 'both'] as const).map((schedule) => (
+                {(["weekday", "weekend", "both"] as const).map((schedule) => (
                   <TouchableOpacity
                     key={schedule}
                     style={[
                       styles.scheduleOption,
-                      selectedSchedule === schedule && styles.selectedScheduleOption,
-                      { 
-                        backgroundColor: selectedSchedule === schedule ? colors.highlight : colors.surface,
-                        borderColor: selectedSchedule === schedule ? colors.highlight : colors.neutral,
-                      }
+                      selectedSchedule === schedule &&
+                        styles.selectedScheduleOption,
+                      {
+                        backgroundColor:
+                          selectedSchedule === schedule
+                            ? colors.highlight
+                            : colors.surface,
+                        borderColor:
+                          selectedSchedule === schedule
+                            ? colors.highlight
+                            : colors.neutral,
+                      },
                     ]}
                     onPress={() => setSelectedSchedule(schedule)}
                     disabled={loading}
                   >
-                    <Text 
+                    <Text
                       style={[
                         styles.scheduleText,
-                        { color: selectedSchedule === schedule ? '#000' : colors.text }
+                        {
+                          color:
+                            selectedSchedule === schedule
+                              ? "#000"
+                              : colors.text,
+                        },
                       ]}
                     >
                       {schedule.charAt(0).toUpperCase() + schedule.slice(1)}
@@ -445,20 +593,28 @@ export default function RoutineScreen() {
                 ))}
               </View>
             </View>
-            
+
             <View style={styles.formActions}>
               <TouchableOpacity
-                style={[styles.cancelButton, { backgroundColor: colors.surface }]}
+                style={[
+                  styles.cancelButton,
+                  { backgroundColor: colors.surface },
+                ]}
                 onPress={() => {
                   setShowNewRoutineForm(false);
-                  setNewRoutineName('');
+                  setNewRoutineName("");
                 }}
                 disabled={loading}
               >
-                <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.text }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.createButton, { backgroundColor: colors.highlight }]}
+                style={[
+                  styles.createButton,
+                  { backgroundColor: colors.highlight },
+                ]}
                 onPress={handleCreateRoutine}
                 disabled={loading}
               >
@@ -470,43 +626,60 @@ export default function RoutineScreen() {
 
         {/* Active Routine Content */}
         {activeRoutine ? (
-          <View style={[styles.routineContent, { backgroundColor: colors.card }]}>
+          <View
+            style={[styles.routineContent, { backgroundColor: colors.card }]}
+          >
             <View style={styles.routineHeader}>
               <View>
-                <Text style={[styles.routineName, { color: colors.text }]}>{activeRoutine.name}</Text>
-                <Text style={[styles.routineSchedule, { color: colors.subtext }]}>
-                  {activeRoutine.schedule === 'both' ? 'Every day' : 
-                   activeRoutine.schedule === 'weekday' ? 'Weekdays only' : 'Weekends only'}
+                <Text style={[styles.routineName, { color: colors.text }]}>
+                  {activeRoutine.name}
+                </Text>
+                <Text
+                  style={[styles.routineSchedule, { color: colors.subtext }]}
+                >
+                  {activeRoutine.schedule === "both"
+                    ? "Every day"
+                    : activeRoutine.schedule === "weekday"
+                    ? "Weekdays only"
+                    : "Weekends only"}
                 </Text>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.deleteButton}
-                onPress={() => handleDeleteRoutine(activeRoutine.id)}
+                onPress={() => openDeleteRoutineConfirm(activeRoutine.id)}
                 disabled={loading}
               >
                 <Text style={styles.deleteButtonText}>🗑️</Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Progress Bar */}
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBarBackground, { backgroundColor: colors.surface }]} />
-              <View 
+              <View
                 style={[
-                  styles.progressBarFill, 
-                  { 
+                  styles.progressBarBackground,
+                  { backgroundColor: colors.surface },
+                ]}
+              />
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
                     backgroundColor: colors.highlight,
-                    width: `${completionPercentage}%`
-                  }
-                ]} 
+                    width: `${completionPercentage}%`,
+                  },
+                ]}
               />
               <Text style={[styles.progressText, { color: colors.text }]}>
-                {completionPercentage}% completed ({completedItems}/{totalItems})
+                {completionPercentage}% completed ({completedItems}/{totalItems}
+                )
               </Text>
             </View>
-            
+
             {/* Add Item Form */}
-            <View style={[styles.addItemForm, { backgroundColor: colors.surface }]}>
+            <View
+              style={[styles.addItemForm, { backgroundColor: colors.surface }]}
+            >
               <TextInput
                 style={[styles.itemInput, { color: colors.text }]}
                 placeholder="Add a new routine item..."
@@ -515,20 +688,25 @@ export default function RoutineScreen() {
                 onChangeText={setNewItemText}
                 editable={!loading}
               />
-              <TouchableOpacity 
-                style={[styles.addButton, { backgroundColor: colors.highlight }]}
+              <TouchableOpacity
+                style={[
+                  styles.addButton,
+                  { backgroundColor: colors.highlight },
+                ]}
                 onPress={handleAddItem}
                 disabled={loading}
               >
                 <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Routine Items */}
             <View style={styles.itemsContainer}>
               {activeRoutine.items.length === 0 ? (
                 <View style={styles.emptyItems}>
-                  <Text style={[styles.emptyItemsText, { color: colors.subtext }]}>
+                  <Text
+                    style={[styles.emptyItemsText, { color: colors.subtext }]}
+                  >
                     No items in this routine yet. Add your first item above.
                   </Text>
                 </View>
@@ -539,29 +717,49 @@ export default function RoutineScreen() {
                     style={[
                       styles.item,
                       item.completed && styles.completedItem,
-                      { backgroundColor: colors.surface }
+                      { backgroundColor: colors.surface },
                     ]}
                     onPress={() => handleToggleItem(item.id)}
                     disabled={loading}
                   >
-                    <View style={[
-                      styles.checkbox,
-                      item.completed && styles.checked,
-                      { borderColor: item.completed ? colors.highlight : colors.neutral }
-                    ]}>
-                      {item.completed && <Text style={styles.checkmark}>✓</Text>}
+                    <View
+                      style={[
+                        styles.checkbox,
+                        item.completed && styles.checked,
+                        {
+                          borderColor: item.completed
+                            ? colors.highlight
+                            : colors.neutral,
+                        },
+                      ]}
+                    >
+                      {item.completed && (
+                        <Text style={styles.checkmark}>✓</Text>
+                      )}
                     </View>
                     <View style={styles.itemContent}>
-                      <Text style={[
-                        styles.itemText,
-                        item.completed && styles.completedItemText,
-                        { color: item.completed ? colors.highlight : colors.text }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.itemText,
+                          item.completed && styles.completedItemText,
+                          {
+                            color: item.completed
+                              ? colors.highlight
+                              : colors.text,
+                          },
+                        ]}
+                      >
                         {item.label}
                       </Text>
                       {item.completed && item.completedAt && (
-                        <Text style={[styles.completedAt, { color: colors.subtext }]}>
-                          Completed {new Date(item.completedAt).toLocaleDateString()}
+                        <Text
+                          style={[
+                            styles.completedAt,
+                            { color: colors.subtext },
+                          ]}
+                        >
+                          Completed{" "}
+                          {new Date(item.completedAt).toLocaleDateString()}
                         </Text>
                       )}
                     </View>
@@ -572,20 +770,42 @@ export default function RoutineScreen() {
           </View>
         ) : (
           <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-            <Text style={[styles.emptyIcon, { color: colors.subtext }]}>📋</Text>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Routines Yet</Text>
+            <Text style={[styles.emptyIcon, { color: colors.subtext }]}>
+              📋
+            </Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              No Routines Yet
+            </Text>
             <Text style={[styles.emptyText, { color: colors.subtext }]}>
               Create your first trading routine to build consistency
             </Text>
             <TouchableOpacity
-              style={[styles.createFirstButton, { backgroundColor: colors.highlight }]}
+              style={[
+                styles.createFirstButton,
+                { backgroundColor: colors.highlight },
+              ]}
               onPress={() => setShowNewRoutineForm(true)}
               disabled={loading}
             >
-              <Text style={styles.createFirstButtonText}>Create Your First Routine</Text>
+              <Text style={styles.createFirstButtonText}>
+                Create Your First Routine
+              </Text>
             </TouchableOpacity>
           </View>
         )}
+
+        <ConfirmModal
+          visible={confirmDeleteVisible}
+          title="Delete Routine"
+          message="Are you sure you want to delete this routine? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={performDeleteRoutine}
+          onCancel={() => {
+            setConfirmDeleteVisible(false);
+            setRoutineToDelete(null);
+          }}
+        />
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -604,16 +824,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
   },
   title: {
     fontSize: 32,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: -0.5,
     marginBottom: 4,
   },
@@ -621,30 +841,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   loadingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
   },
   loadingText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   streakBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
   },
   streakContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   streakEmoji: {
     fontSize: 24,
@@ -655,7 +875,7 @@ const styles = StyleSheet.create({
   },
   streakValue: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   completeButton: {
     paddingHorizontal: 16,
@@ -663,19 +883,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   completeButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: "#000",
+    fontWeight: "bold",
   },
   routineSelector: {
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 12,
   },
   routineTabs: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   routineTab: {
     paddingHorizontal: 16,
@@ -688,7 +908,7 @@ const styles = StyleSheet.create({
     // Styles applied conditionally
   },
   routineTabText: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
   },
   routineStreak: {
@@ -700,7 +920,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: "#444",
   },
   newRoutineText: {
     fontSize: 14,
@@ -712,7 +932,7 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 16,
   },
   inputGroup: {
@@ -720,7 +940,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
   inputContainer: {
@@ -731,7 +951,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   scheduleOptions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   scheduleOption: {
@@ -739,50 +959,50 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   selectedScheduleOption: {
     // Styles applied conditionally
   },
   scheduleText: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   formActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   cancelButton: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   createButton: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   createButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: "#000",
+    fontWeight: "bold",
   },
   routineContent: {
     borderRadius: 12,
     padding: 16,
   },
   routineHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   routineName: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   routineSchedule: {
     fontSize: 14,
@@ -795,12 +1015,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   progressBarContainer: {
-    position: 'relative',
+    position: "relative",
     height: 30,
     marginBottom: 20,
   },
   progressBarBackground: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -808,24 +1028,24 @@ const styles = StyleSheet.create({
     borderRadius: 15,
   },
   progressBarFill: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     height: 30,
     borderRadius: 15,
   },
   progressText: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 30,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   addItemForm: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 20,
     borderRadius: 8,
   },
@@ -836,19 +1056,19 @@ const styles = StyleSheet.create({
   },
   addButton: {
     paddingHorizontal: 16,
-    justifyContent: 'center',
+    justifyContent: "center",
     borderRadius: 8,
   },
   addButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: "#000",
+    fontWeight: "bold",
   },
   itemsContainer: {
     gap: 8,
   },
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
   },
@@ -861,41 +1081,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   checked: {
-    // Styles applied conditionally
+    backgroundColor: "#00d4d4",
   },
   checkmark: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 14,
   },
   itemContent: {
     flex: 1,
   },
   itemText: {
     fontSize: 16,
-    marginBottom: 4,
+    fontWeight: "500",
   },
   completedItemText: {
-    textDecorationLine: 'line-through',
-    // Styles applied conditionally
+    textDecorationLine: "line-through",
   },
   completedAt: {
     fontSize: 12,
+    marginTop: 4,
   },
   emptyItems: {
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyItemsText: {
-    textAlign: 'center',
+    fontSize: 14,
+    textAlign: "center",
   },
   emptyState: {
-    padding: 32,
+    padding: 30,
+    alignItems: "center",
     borderRadius: 12,
-    alignItems: 'center',
+    marginTop: 20,
   },
   emptyIcon: {
     fontSize: 48,
@@ -903,22 +1126,22 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 20,
   },
   createFirstButton: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
   createFirstButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 16,
+    color: "#000",
+    fontWeight: "bold",
   },
 });

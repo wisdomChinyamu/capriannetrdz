@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
 import { useTheme } from "./ThemeProvider";
+import { useAppContext } from "../hooks/useAppContext";
 import { Trade } from "../types";
 
 interface WeeklySummaryPanelProps {
@@ -30,6 +31,10 @@ export default function WeeklySummaryPanel({
   layout = 'vertical',
 }: WeeklySummaryPanelProps) {
   const { colors } = useTheme();
+  const { state } = useAppContext();
+  const uiScale = state.uiScale || 'normal';
+  const scaleMultiplier = uiScale === 'small' ? 0.86 : uiScale === 'large' ? 1.12 : 1;
+  
   const toDate = (value: any): Date | null => {
     if (!value && value !== 0) return null;
     if (typeof value?.toDate === 'function') {
@@ -113,8 +118,8 @@ export default function WeeklySummaryPanel({
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.text }]}>Weekly Summary</Text>
-          <Text style={[styles.monthName, { color: colors.subtext }]}>
+          <Text style={[styles.title, { color: colors.text, fontSize: 18 * scaleMultiplier }]}>Weekly Summary</Text>
+          <Text style={[styles.monthName, { color: colors.subtext, fontSize: 13 * scaleMultiplier }]}>
             {new Date(year, month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}
           </Text>
         </View>
@@ -126,19 +131,19 @@ export default function WeeklySummaryPanel({
           style={[styles.navButton, { backgroundColor: colors.neutral }]}
           onPress={goToPrevMonth}
         >
-          <Text style={styles.navIcon}>‹</Text>
+          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>‹</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.todayButton, { backgroundColor: colors.highlight }]}
           onPress={goToCurrentMonth}
         >
-          <Text style={[styles.todayText, { color: colors.background }]}>Today</Text>
+          <Text style={[styles.todayText, { color: colors.background, fontSize: 13 * scaleMultiplier }]}>Today</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.navButton, { backgroundColor: colors.neutral }]}
           onPress={goToNextMonth}
         >
-          <Text style={styles.navIcon}>›</Text>
+          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>›</Text>
         </TouchableOpacity>
       </View>
 
@@ -146,15 +151,15 @@ export default function WeeklySummaryPanel({
       <View style={[styles.overviewCard, { backgroundColor: 'rgba(0, 212, 212, 0.05)', borderColor: 'rgba(0, 212, 212, 0.2)' }]}>
         <View style={styles.overviewRow}>
           <View style={styles.overviewItem}>
-            <Text style={[styles.overviewLabel, { color: colors.subtext }]}>Trades</Text>
-            <Text style={[styles.overviewValue, { color: colors.text }]}>{totalTrades}</Text>
+            <Text style={[styles.overviewLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>Trades</Text>
+            <Text style={[styles.overviewValue, { color: colors.text, fontSize: 20 * scaleMultiplier }]}>{totalTrades}</Text>
           </View>
           <View style={styles.overviewDivider} />
           <View style={styles.overviewItem}>
-            <Text style={[styles.overviewLabel, { color: colors.subtext }]}>P&L</Text>
+            <Text style={[styles.overviewLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>P&L</Text>
             <Text style={[
               styles.overviewValue, 
-              { color: totalPnL >= 0 ? colors.profitEnd : colors.lossEnd }
+              { color: totalPnL >= 0 ? colors.profitEnd : colors.lossEnd, fontSize: 20 * scaleMultiplier }
             ]}>
               {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(1)}
             </Text>
@@ -182,7 +187,7 @@ export default function WeeklySummaryPanel({
                     : w.totalPnL < 0
                     ? 'rgba(244, 67, 54, 0.15)'
                     : 'rgba(255, 165, 0, 0.15)',
-                  borderWidth: isCurrentWeek ? 2 : 1,
+                  borderWidth: 1 * scaleMultiplier,
                   borderColor: isCurrentWeek 
                     ? colors.highlight 
                     : isEmpty
@@ -197,35 +202,35 @@ export default function WeeklySummaryPanel({
             >
               <View style={styles.weekHeader}>
                 <View style={styles.weekLabelContainer}>
-                  <Text style={[styles.weekLabel, { color: colors.text }]}>
+                  <Text style={[styles.weekLabel, { color: colors.text, fontSize: 14 * scaleMultiplier }]}>
                     Week {w.week}
                   </Text>
                   {isCurrentWeek && (
                     <View style={[styles.currentBadge, { backgroundColor: colors.highlight }]}>
-                      <Text style={[styles.currentBadgeText, { color: colors.background }]}>Now</Text>
+                      <Text style={[styles.currentBadgeText, { color: colors.background, fontSize: 9 * scaleMultiplier }]}>Now</Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.weekDate, { color: colors.subtext }]}>
+                <Text style={[styles.weekDate, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
                   {w.range.start.getDate()}-{w.range.end.getDate()}
                 </Text>
               </View>
 
               {isEmpty ? (
                 <View style={styles.emptyWeek}>
-                  <Text style={[styles.emptyText, { color: colors.subtext }]}>No trades</Text>
+                  <Text style={[styles.emptyText, { color: colors.subtext, fontSize: 12 * scaleMultiplier }]}>No trades</Text>
                 </View>
               ) : (
                 <>
                   <View style={styles.weekPnLContainer}>
                     <Text style={[
                       styles.weekPnL, 
-                      { color: w.totalPnL >= 0 ? colors.profitEnd : colors.lossEnd }
+                      { color: w.totalPnL >= 0 ? colors.profitEnd : colors.lossEnd, fontSize: 24 * scaleMultiplier }
                     ]}>
                       {w.totalPnL >= 0 ? '+' : ''}{w.totalPnL.toFixed(1)}R
                     </Text>
                     <View style={styles.weekPnLIndicator}>
-                      <Text style={styles.weekPnLIcon}>
+                      <Text style={[styles.weekPnLIcon, { fontSize: 16 * scaleMultiplier }]}>
                         {w.totalPnL > 0 ? '📈' : w.totalPnL < 0 ? '📉' : '—'}
                       </Text>
                     </View>
@@ -233,20 +238,20 @@ export default function WeeklySummaryPanel({
 
                   <View style={styles.weekStats}>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext }]}>Trades</Text>
-                      <Text style={[styles.weekStatValue, { color: colors.text }]}>{w.trades}</Text>
+                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>Trades</Text>
+                      <Text style={[styles.weekStatValue, { color: colors.text, fontSize: 13 * scaleMultiplier }]}>{w.trades}</Text>
                     </View>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext }]}>W/L</Text>
-                      <Text style={[styles.weekStatValue, { color: colors.text }]}>
+                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>W/L</Text>
+                      <Text style={[styles.weekStatValue, { color: colors.text, fontSize: 13 * scaleMultiplier }]}>
                         {w.wins}/{w.losses}
                       </Text>
                     </View>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext }]}>Win %</Text>
+                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>Win %</Text>
                       <Text style={[
                         styles.weekStatValue, 
-                        { color: w.winRate >= 50 ? colors.profitEnd : colors.lossEnd }
+                        { color: w.winRate >= 50 ? colors.profitEnd : colors.lossEnd, fontSize: 13 * scaleMultiplier }
                       ]}>
                         {w.winRate.toFixed(0)}%
                       </Text>
@@ -262,10 +267,10 @@ export default function WeeklySummaryPanel({
       {/* Best Week Highlight */}
       {bestWeek && bestWeek.trades > 0 && (
         <View style={[styles.bestWeekCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)', borderColor: colors.profitEnd }]}>
-          <Text style={styles.bestWeekIcon}>🏆</Text>
+          <Text style={[styles.bestWeekIcon, { fontSize: 24 * scaleMultiplier }]}>🏆</Text>
           <View style={styles.bestWeekInfo}>
-            <Text style={[styles.bestWeekLabel, { color: colors.subtext }]}>Best Week</Text>
-            <Text style={[styles.bestWeekValue, { color: colors.profitEnd }]}>
+            <Text style={[styles.bestWeekLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>Best Week</Text>
+            <Text style={[styles.bestWeekValue, { color: colors.profitEnd, fontSize: 14 * scaleMultiplier }]}>
               Week {bestWeek.week}: +{bestWeek.totalPnL.toFixed(1)}R
             </Text>
           </View>

@@ -12,7 +12,7 @@ interface PerformanceByPairChartProps {
 export default function PerformanceByPairChart({
   trades,
 }: PerformanceByPairChartProps) {
-  const { colors } = useTheme();
+  const { colors, fontFamily } = useTheme();
   const width = Dimensions.get("window").width - 32;
   const height = 280;
   const padding = { top: 30, right: 20, bottom: 60, left: 50 };
@@ -27,16 +27,16 @@ export default function PerformanceByPairChart({
           <Text style={[styles.title, { color: colors.text }]}>
             Performance by Pair
           </Text>
-          <View style={[styles.badge, { backgroundColor: `${colors.highlight}20` }]}>
+          <View
+            style={[styles.badge, { backgroundColor: `${colors.highlight}20` }]}
+          >
             <Text style={[styles.badgeText, { color: colors.highlight }]}>
               📊
             </Text>
           </View>
         </View>
         <View style={styles.noDataContainer}>
-          <Text style={[styles.noDataIcon, { color: colors.subtext }]}>
-            📈
-          </Text>
+          <Text style={[styles.noDataIcon, { color: colors.subtext }]}>📈</Text>
           <Text style={[styles.noDataText, { color: colors.subtext }]}>
             No trades by pair yet
           </Text>
@@ -58,7 +58,7 @@ export default function PerformanceByPairChart({
   const getBarColor = (percentage: number) => {
     if (percentage >= 70) return colors.profitEnd;
     if (percentage >= 60) return colors.profitStart;
-    if (percentage >= 50) return '#ffa726';
+    if (percentage >= 50) return "#ffa726";
     if (percentage >= 40) return colors.lossStart;
     return colors.lossEnd;
   };
@@ -100,7 +100,9 @@ export default function PerformanceByPairChart({
             Win rate comparison across {pairs.length} pairs
           </Text>
         </View>
-        <View style={[styles.badge, { backgroundColor: `${colors.highlight}20` }]}>
+        <View
+          style={[styles.badge, { backgroundColor: `${colors.highlight}20` }]}
+        >
           <Text style={[styles.badgeText, { color: colors.highlight }]}>
             {pairs.length}
           </Text>
@@ -134,6 +136,7 @@ export default function PerformanceByPairChart({
                 fontSize="10"
                 fontWeight="600"
                 textAnchor="end"
+                fontFamily={fontFamily}
               >
                 {line.value.toFixed(0)}%
               </SvgText>
@@ -153,7 +156,7 @@ export default function PerformanceByPairChart({
                 rx="6"
                 opacity="0.9"
               />
-              
+
               {/* Bar highlight */}
               <Rect
                 x={bar.x}
@@ -172,6 +175,7 @@ export default function PerformanceByPairChart({
                 fontSize="12"
                 fontWeight="700"
                 textAnchor="middle"
+                fontFamily={fontFamily}
               >
                 {bar.percentage.toFixed(0)}%
               </SvgText>
@@ -184,10 +188,11 @@ export default function PerformanceByPairChart({
                 fontSize="12"
                 fontWeight="700"
                 textAnchor="middle"
+                fontFamily={fontFamily}
               >
                 {bar.pair}
               </SvgText>
-              
+
               {/* Win rate category label */}
               <SvgText
                 x={bar.x + barWidth / 2}
@@ -197,8 +202,13 @@ export default function PerformanceByPairChart({
                 fontWeight="600"
                 textAnchor="middle"
                 opacity="0.8"
+                fontFamily={fontFamily}
               >
-                {bar.percentage >= 60 ? "Strong" : bar.percentage >= 50 ? "Good" : "Weak"}
+                {bar.percentage >= 60
+                  ? "Strong"
+                  : bar.percentage >= 50
+                  ? "Good"
+                  : "Weak"}
               </SvgText>
             </React.Fragment>
           ))}
@@ -230,6 +240,7 @@ export default function PerformanceByPairChart({
             fontWeight="600"
             textAnchor="middle"
             transform={`rotate(-90, 15, ${padding.top + chartHeight / 2})`}
+            fontFamily={fontFamily}
           >
             Win Rate (%)
           </SvgText>
@@ -239,19 +250,23 @@ export default function PerformanceByPairChart({
       {/* Legend */}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.profitEnd }]} />
+          <View
+            style={[styles.legendDot, { backgroundColor: colors.profitEnd }]}
+          />
           <Text style={[styles.legendText, { color: colors.subtext }]}>
             70%+ Strong
           </Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#ffa726' }]} />
+          <View style={[styles.legendDot, { backgroundColor: "#ffa726" }]} />
           <Text style={[styles.legendText, { color: colors.subtext }]}>
             50-60% Good
           </Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.lossEnd }]} />
+          <View
+            style={[styles.legendDot, { backgroundColor: colors.lossEnd }]}
+          />
           <Text style={[styles.legendText, { color: colors.subtext }]}>
             &lt;40% Weak
           </Text>
@@ -266,7 +281,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,

@@ -5,7 +5,7 @@ export interface TradingAccount {
   name: string;
   startingBalance: number;
   currentBalance: number;
-  type?: 'demo' | 'live';
+  type?: "demo" | "live";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +23,8 @@ export interface User {
   uid: string;
   email: string;
   username: string;
+  firstName?: string;
+  lastName?: string;
   timezone: string;
   createdAt: Date;
 }
@@ -99,7 +101,7 @@ export interface RoutineItem {
   id: string;
   label: string;
   description?: string;
-  category: 'Critical' | 'Important' | 'Optional';
+  category: "Critical" | "Important" | "Optional";
   completed: boolean;
   completedAt?: Date | null;
 }
@@ -109,7 +111,7 @@ export interface Routine {
   userId: string;
   name: string;
   items: RoutineItem[];
-  schedule: 'weekday' | 'weekend' | 'both';
+  schedule: "weekday" | "weekend" | "both";
   streak: number;
   lastCompleted?: Date;
   createdAt: Date;

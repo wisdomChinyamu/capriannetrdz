@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../config/firebase";
+import { signUp, createUserProfile } from "../services/firebaseService";
+import { useToast } from "../context/ToastContext";
 import { useTheme } from "../components/ThemeProvider";
 
 export default function SignUpScreen({ navigation }: any) {
@@ -20,12 +22,24 @@ export default function SignUpScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const toast = useToast();
 
   const validateForm = () => {
+    if (!firstName.trim()) {
+      Alert.alert("Validation Error", "Please enter your first name");
+      return false;
+    }
+    if (!username.trim()) {
+      Alert.alert("Validation Error", "Please choose a username");
+      return false;
+    }
     if (!email.trim()) {
       Alert.alert("Validation Error", "Please enter your email address");
       return false;
@@ -50,20 +64,39 @@ export default function SignUpScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      Alert.alert("Success", "Account created successfully! Welcome to Caprianne Trdz.");
+      // Use centralized signUp helper (wraps Firebase Auth)
+      const user = await signUp(email, password);
+      // Create a profile doc in Firestore
+      if (user && user.uid) {
+        await createUserProfile(user.uid, {
+          username,
+          firstName,
+          lastName,
+          email,
+        });
+      }
+      try {
+        toast.show(
+          "Account created successfully! Welcome to Caprianne Trdz.",
+          "success"
+        );
+      } catch (e) {}
       navigation.replace("Dashboard"); // Navigate to dashboard after signup
     } catch (error: any) {
       let errorMessage = "An error occurred during sign up";
-      
+
       if (error.code === "auth/email-already-in-use") {
-        errorMessage = "This email is already registered. Please login instead.";
+        errorMessage =
+          "This email is already registered. Please login instead.";
       } else if (error.code === "auth/invalid-email") {
         errorMessage = "Invalid email address format";
       } else if (error.code === "auth/weak-password") {
         errorMessage = "Password is too weak. Please use a stronger password.";
       }
-      
+
+      try {
+        toast.show(errorMessage, "error");
+      } catch (e) {}
       Alert.alert("Sign Up Error", errorMessage);
     } finally {
       setLoading(false);
@@ -72,16 +105,16 @@ export default function SignUpScreen({ navigation }: any) {
 
   const getPasswordStrength = () => {
     if (!password) return { strength: 0, label: "", color: colors.subtext };
-    
+
     let strength = 0;
     if (password.length >= 6) strength += 25;
     if (password.length >= 8) strength += 25;
     if (/[A-Z]/.test(password)) strength += 25;
     if (/[0-9]/.test(password)) strength += 25;
-    
+
     let label = "";
     let color = colors.lossEnd;
-    
+
     if (strength <= 25) {
       label = "Weak";
       color = colors.lossEnd;
@@ -95,7 +128,7 @@ export default function SignUpScreen({ navigation }: any) {
       label = "Strong";
       color = colors.profitEnd;
     }
-    
+
     return { strength, label, color };
   };
 
@@ -113,8 +146,15 @@ export default function SignUpScreen({ navigation }: any) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={[styles.logoBadge, { backgroundColor: `${colors.highlight}20` }]}>
-            <Text style={[styles.logoIcon, { color: colors.highlight }]}>📊</Text>
+          <View
+            style={[
+              styles.logoBadge,
+              { backgroundColor: `${colors.highlight}20` },
+            ]}
+          >
+            <Text style={[styles.logoIcon, { color: colors.highlight }]}>
+              📊
+            </Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>
             Create Account
@@ -127,6 +167,95 @@ export default function SignUpScreen({ navigation }: any) {
         {/* Form Card */}
         <View style={[styles.formCard, { backgroundColor: colors.card }]}>
           {/* Email Input */}
+          {/* First / Last / Username Inputs */}
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              First Name
+            </Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor:
+                    focusedField === "firstName"
+                      ? colors.highlight
+                      : `${colors.text}20`,
+                  borderWidth: 2,
+                },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="First name"
+                placeholderTextColor={colors.subtext}
+                value={firstName}
+                onChangeText={setFirstName}
+                onFocus={() => setFocusedField("firstName")}
+                onBlur={() => setFocusedField(null)}
+                editable={!loading}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Last Name
+            </Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor:
+                    focusedField === "lastName"
+                      ? colors.highlight
+                      : `${colors.text}20`,
+                  borderWidth: 2,
+                },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="Last name"
+                placeholderTextColor={colors.subtext}
+                value={lastName}
+                onChangeText={setLastName}
+                onFocus={() => setFocusedField("lastName")}
+                onBlur={() => setFocusedField(null)}
+                editable={!loading}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>Username</Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor:
+                    focusedField === "username"
+                      ? colors.highlight
+                      : `${colors.text}20`,
+                  borderWidth: 2,
+                },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="username"
+                placeholderTextColor={colors.subtext}
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                onFocus={() => setFocusedField("username")}
+                onBlur={() => setFocusedField(null)}
+                editable={!loading}
+              />
+            </View>
+          </View>
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.text }]}>
               Email Address
@@ -164,9 +293,7 @@ export default function SignUpScreen({ navigation }: any) {
 
           {/* Password Input */}
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Password
-            </Text>
+            <Text style={[styles.label, { color: colors.text }]}>Password</Text>
             <View
               style={[
                 styles.inputWrapper,
@@ -203,11 +330,16 @@ export default function SignUpScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Password Strength Indicator */}
             {password.length > 0 && (
               <View style={styles.strengthContainer}>
-                <View style={[styles.strengthBar, { backgroundColor: `${colors.text}10` }]}>
+                <View
+                  style={[
+                    styles.strengthBar,
+                    { backgroundColor: `${colors.text}10` },
+                  ]}
+                >
                   <View
                     style={[
                       styles.strengthFill,
@@ -218,7 +350,12 @@ export default function SignUpScreen({ navigation }: any) {
                     ]}
                   />
                 </View>
-                <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
+                <Text
+                  style={[
+                    styles.strengthText,
+                    { color: passwordStrength.color },
+                  ]}
+                >
                   {passwordStrength.label}
                 </Text>
               </View>
@@ -266,7 +403,7 @@ export default function SignUpScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Password Match Indicator */}
             {confirmPassword.length > 0 && (
               <View style={styles.matchContainer}>
@@ -402,7 +539,7 @@ const styles = StyleSheet.create({
   formCard: {
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -479,7 +616,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 54,
-    shadowColor: '#00d4d4',
+    shadowColor: "#00d4d4",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
