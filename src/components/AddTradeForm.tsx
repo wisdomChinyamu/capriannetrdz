@@ -14,6 +14,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Trade, ChecklistItem, Strategy, TradingAccount } from "../types";
 import { ThemeMode } from "../theme/theme";
 import ImageUploader from "./ImageUploader";
+import ConfirmModal from "./ConfirmModal";
 import { useTheme } from "./ThemeProvider";
 import AccountDropdown from "./AccountDropdown";
 import { useAppContext } from "../hooks/useAppContext";
@@ -35,6 +36,7 @@ interface AddTradeFormProps {
   selectedAccountId?: string; // Add selectedAccountId prop
   onAccountSelect?: (accountId: string) => void; // Add onAccountSelect prop
   onAddAccount?: () => void;
+  confirmBeforeSave?: boolean;
 }
 
 export default function AddTradeForm({
@@ -51,6 +53,7 @@ export default function AddTradeForm({
   selectedAccountId, // Add selectedAccountId prop
   onAccountSelect, // Add onAccountSelect prop
   onAddAccount,
+  confirmBeforeSave = false,
 }: AddTradeFormProps) {
   const { state } = useAppContext();
   const [pair, setPair] = React.useState("GBPUSD");
@@ -129,6 +132,8 @@ export default function AddTradeForm({
   })();
 
   const { colors } = useTheme();
+  const [showConfirmation, setShowConfirmation] = React.useState(false);
+  const [pendingTrade, setPendingTrade] = React.useState<any | null>(null);
 
   const calculateRR = () => {
     if (!entryPrice || !stopLoss || !takeProfit) return 0;
@@ -278,6 +283,12 @@ export default function AddTradeForm({
         tradeTime: tradeTimestamp,
       };
 
+      if (confirmBeforeSave) {
+        setPendingTrade(tradeData);
+        setShowConfirmation(true);
+        return;
+      }
+
       await onSubmit(tradeData);
 
       onClose();
@@ -287,6 +298,19 @@ export default function AddTradeForm({
         "Error",
         error.message || "Failed to submit trade. Please try again."
       );
+    }
+  };
+
+  const confirmAndSaveTrade = async () => {
+    if (!pendingTrade) return;
+    try {
+      await onSubmit(pendingTrade);
+      setShowConfirmation(false);
+      setPendingTrade(null);
+      onClose();
+    } catch (err: any) {
+      console.error("Error saving trade from confirmation:", err);
+      Alert.alert("Error", err?.message || "Failed to save trade.");
     }
   };
 
@@ -1292,6 +1316,32 @@ export default function AddTradeForm({
           </View>
         </View>
       </ScrollView>
+      <ConfirmModal
+        visible={showConfirmation}
+        title={"Confirm Trade"}
+        confirmText={"Save"}
+        cancelText={"Cancel"}
+        onConfirm={confirmAndSaveTrade}
+        onCancel={() => {
+          setShowConfirmation(false);
+          setPendingTrade(null);
+        }}
+      >
+        {pendingTrade ? (
+          <View>
+            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+              {pendingTrade.pair} • {pendingTrade.direction}
+            </Text>
+            <Text style={{ marginBottom: 6 }}>
+              Entry: {pendingTrade.entryPrice} • SL: {pendingTrade.stopLoss} • TP: {pendingTrade.takeProfit}
+            </Text>
+            <Text style={{ marginBottom: 6 }}>
+              Account: {pendingTrade.accountId || "—"}
+            </Text>
+            <Text>R:R: {pendingTrade.riskToReward}</Text>
+          </View>
+        ) : null}
+      </ConfirmModal>
     </KeyboardAvoidingView>
   );
 }

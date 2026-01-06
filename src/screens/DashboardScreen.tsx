@@ -879,6 +879,7 @@ function AddTradeModalAnimated({ visible, onClose, onSubmit }: any) {
           selectedStrategyId={selectedStrategyId}
           onStrategySelect={handleStrategySelect}
           confluenceScore={confluenceScore}
+          confirmBeforeSave={true}
         />
       </Card>
     </Animated.View>

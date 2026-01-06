@@ -144,6 +144,28 @@ export default function AddTradeScreen({
   const editingTrade = route?.params?.trade || null;
   const toast = useToast();
 
+  // Debug / assist: notify when confirmation modal opens so we can verify web/native behavior
+  useEffect(() => {
+    try {
+      if (showConfirmation) {
+        console.warn("showConfirmation toggled true, platform:", Platform.OS);
+        try {
+          toast?.show?.("Opening confirmation", "info", 1200);
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }, [showConfirmation]);
+
+  const showValidation = (msg: string) => {
+    try {
+      console.warn("Validation failed:", msg);
+      toast?.show?.(msg, "error");
+    } catch (e) {}
+    try {
+      Alert.alert("Validation Error", msg);
+    } catch (e) {}
+  };
+
   const parseDate = (value: any): Date | null => {
     if (value === undefined || value === null) return null;
     if (typeof value?.toDate === "function") {
@@ -547,19 +569,22 @@ export default function AddTradeScreen({
   };
 
   const handleSubmit = async () => {
+    console.warn("handleSubmit called", {
+      entryPrice,
+      stopLoss,
+      takeProfit,
+      selectedAccountId,
+      tradeDate: tradeDate?.toString(),
+      tradeTimeText,
+    });
+
     if (!entryPrice || !stopLoss || !takeProfit) {
-      Alert.alert(
-        "Validation Error",
-        "Please fill in entry, stop loss, and take profit prices"
-      );
+      showValidation("Please fill in entry, stop loss, and take profit prices");
       return;
     }
 
     if (!selectedAccountId) {
-      Alert.alert(
-        "Validation Error",
-        "Please select a trading account for this trade."
-      );
+      showValidation("Please select a trading account for this trade.");
       return;
     }
 
@@ -569,18 +594,14 @@ export default function AddTradeScreen({
     const tp = Number(takeProfit);
     if (direction === "Buy") {
       if (!(sl < e && e < tp)) {
-        Alert.alert(
-          "Validation Error",
-          "For a Buy trade ensure Stop Loss < Entry < Take Profit."
-        );
+        console.warn("Directional validation failed for Buy", { e, sl, tp });
+        showValidation("For a Buy trade ensure Stop Loss < Entry < Take Profit.");
         return;
       }
     } else {
       if (!(tp < e && e < sl)) {
-        Alert.alert(
-          "Validation Error",
-          "For a Sell trade ensure Take Profit < Entry < Stop Loss."
-        );
+        console.warn("Directional validation failed for Sell", { e, sl, tp });
+        showValidation("For a Sell trade ensure Take Profit < Entry < Stop Loss.");
         return;
       }
     }
@@ -590,17 +611,33 @@ export default function AddTradeScreen({
       Number(stopLoss) <= 0 ||
       Number(takeProfit) <= 0
     ) {
-      Alert.alert("Validation Error", "Prices must be greater than 0");
+      console.warn("Price positive validation failed", { entryPrice, stopLoss, takeProfit });
+      showValidation("Prices must be greater than 0");
       return;
     }
 
     if (!rr) {
-      Alert.alert("Calculation Error", "Could not calculate R:R ratio");
+      console.warn("RR missing or zero", { rr });
+      showValidation("Could not calculate R:R ratio. Check price inputs.");
       return;
     }
 
     // Build trade timestamp combining date + time text (if provided)
+    // Ensure tradeDate is a valid date
+    if (!tradeDate || isNaN(new Date(tradeDate).getTime())) {
+      showValidation("Please enter a valid entry date.");
+      return;
+    }
     let tradeTimestamp = new Date(tradeDate);
+
+    // If user provided a time string, enforce HH:MM 24-hour format
+    if (tradeTimeText && tradeTimeText.length > 0) {
+      const timeRegex = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+      if (!timeRegex.test(tradeTimeText)) {
+        showValidation("Please enter time in 24-hour format HH:MM (e.g. 14:30).");
+        return;
+      }
+    }
     try {
       if (tradeTimeText && tradeTimeText.includes(":")) {
         const [hh, mm] = tradeTimeText.split(":").map((s) => parseInt(s, 10));
@@ -620,7 +657,8 @@ export default function AddTradeScreen({
       actualExit ? Number(actualExit) : undefined
     );
 
-    const previewTrade: any = {
+    try {
+      const previewTrade: any = {
       pair: pair as any,
       direction,
       session,
@@ -643,18 +681,33 @@ export default function AddTradeScreen({
       riskAmount: riskAmount ? Number(riskAmount) : undefined,
       marketCondition: marketCondition || undefined,
       tradeTime: tradeTimestamp,
-    };
+      };
 
-    // Show confirmation modal with previewTrade
-    setPendingTrade(previewTrade);
-    setShowConfirmation(true);
+      // Debug: log preview before showing confirmation
+      try {
+        console.warn("previewTrade prepared", previewTrade);
+      } catch (e) {}
+
+      // Show confirmation modal with previewTrade
+      setPendingTrade(previewTrade);
+      setShowConfirmation(true);
+      try {
+        console.warn("setPendingTrade/setShowConfirmation called");
+      } catch (e) {}
+    } catch (err) {
+      console.error("Error preparing previewTrade:", err);
+      showValidation("Unexpected error preparing trade preview. Check console.");
+      return;
+    }
   };
 
   // Confirm and save the pending trade (uploads screenshots then persists)
   const confirmAndSaveTrade = async () => {
     if (!pendingTrade) return;
     try {
+      console.warn("confirmAndSaveTrade called", { pendingTrade });
       const userId = state.user?.uid;
+      console.warn("current user id", userId);
       if (!userId) throw new Error("User not authenticated");
 
       // Upload any local blobs from the labeled screenshots array
@@ -734,6 +787,9 @@ export default function AddTradeScreen({
         try {
           dispatch({ type: "UPDATE_TRADE", payload: updatedTrade });
         } catch {}
+        try {
+          toast.show("Trade updated", "success");
+        } catch (e) {}
         if (route?.params?.origin === "Journal") {
           try {
             (navigation as any).navigate("Journal", {
@@ -746,11 +802,10 @@ export default function AddTradeScreen({
         } else {
           navigation.goBack();
         }
-        try {
-          toast.show("Trade updated", "success");
-        } catch (e) {}
       } else {
+        console.warn("Saving new trade to backend...", { toSave });
         const newId = await addTrade(userId, toSave);
+        console.warn("addTrade returned id", newId);
         try {
           dispatch({
             type: "ADD_TRADE",
@@ -786,6 +841,9 @@ export default function AddTradeScreen({
 
         setShowConfirmation(false);
         setPendingTrade(null);
+        try {
+          toast.show(`Trade recorded: ${pair} ${direction}`, "success");
+        } catch (e) {}
         if (route?.params?.origin === "Journal") {
           try {
             (navigation as any).navigate("Journal");
@@ -795,9 +853,6 @@ export default function AddTradeScreen({
         } else {
           navigation.goBack();
         }
-        try {
-          toast.show(`Trade recorded: ${pair} ${direction}`, "success");
-        } catch (e) {}
       }
     } catch (err) {
       console.error("Error saving confirmed trade", err);
@@ -1750,159 +1805,125 @@ export default function AddTradeScreen({
       </View>
 
       {/* Submit Button */}
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+      <TouchableOpacity
+        style={styles.submitButton}
+        onPress={() => {
+          try {
+            console.warn("Record Trade button pressed");
+          } catch (e) {}
+          handleSubmit();
+        }}
+      >
         <Text style={styles.submitButtonIcon}>✓</Text>
         <Text style={styles.submitButtonText}>Record Trade</Text>
       </TouchableOpacity>
 
       {/* Account management moved to Settings -> Accounts */}
 
-      {/* Confirmation Modal */}
-      <Modal visible={showConfirmation} animationType="slide" transparent>
-        <View
-          pointerEvents="box-none"
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            padding: 16,
+      {/* Confirmation Modal: use ConfirmModal on web (fixed overlay fallback), keep native Modal elsewhere */}
+      {Platform.OS === "web" ? (
+        <ConfirmModal
+          visible={showConfirmation}
+          title={"Confirm Trade"}
+          confirmText={"Save"}
+          cancelText={"Cancel"}
+          onConfirm={() => {
+            try {
+              toast?.show?.("Saving trade...", "info");
+            } catch (e) {}
+            confirmAndSaveTrade();
+          }}
+          onCancel={() => {
+            setShowConfirmation(false);
+            setPendingTrade(null);
           }}
         >
+          {pendingTrade ? (
+            <View>
+              <Text style={{ color: "#aaa" }}>
+                {pendingTrade.pair} • {pendingTrade.direction}
+              </Text>
+              <Text style={{ color: "#f5f5f5", fontWeight: "700", marginTop: 8 }}>
+                Entry: {pendingTrade.entryPrice}
+              </Text>
+              <Text style={{ color: "#f5f5f5", fontWeight: "700" }}>
+                SL: {pendingTrade.stopLoss} • TP: {pendingTrade.takeProfit}
+              </Text>
+              <Text style={{ color: "#aaa", marginTop: 8 }}>
+                R:R: {pendingTrade.riskToReward ? `1:${pendingTrade.riskToReward.toFixed ? pendingTrade.riskToReward.toFixed(2) : pendingTrade.riskToReward}` : "—"}
+              </Text>
+              <Text style={{ color: "#aaa" }}>
+                Confluence: {pendingTrade.confluenceScore ? `${pendingTrade.confluenceScore.toFixed ? pendingTrade.confluenceScore.toFixed(0) : pendingTrade.confluenceScore}%` : "—"}
+              </Text>
+              <Text style={{ color: "#aaa" }}>
+                Account: {state.accounts.find((a) => a.id === pendingTrade.accountId)?.name || "—"}
+              </Text>
+              <Text style={{ color: "#aaa" }}>
+                Risk Amount: ${pendingTrade.riskAmount ?? "—"}
+              </Text>
+              <Text style={{ color: "#aaa" }}>
+                Market: {pendingTrade.marketCondition || "—"}
+              </Text>
+
+              <View style={{ marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#222" }}>
+                <Text style={{ color: "#aaa", marginBottom: 6, fontWeight: "700" }}>Projected Impact</Text>
+                <Text style={{ color: "#aaa" }}>
+                  Win Rate: {calculateWinRate(state.trades || []).toFixed(1)}% → {pendingTrade.result ? calculateWinRate([...(state.trades || []), pendingTrade as any]).toFixed(1) : "—"}%
+                </Text>
+                <Text style={{ color: "#aaa" }}>
+                  Avg R:R: {calculateAverageRR(state.trades || []).toFixed(2)} → {pendingTrade.riskToReward ? calculateAverageRR([...(state.trades || []), pendingTrade as any]).toFixed(2) : "—"}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </ConfirmModal>
+      ) : (
+        <Modal visible={showConfirmation} animationType="slide" transparent>
           <View
+            pointerEvents="box-none"
             style={{
-              backgroundColor: "#0d0d0d",
-              borderRadius: 12,
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              justifyContent: "center",
               padding: 16,
             }}
           >
-            <Text
-              style={{
-                color: "#f5f5f5",
-                fontSize: 18,
-                fontWeight: "800",
-                marginBottom: 8,
-              }}
-            >
-              Confirm Trade
-            </Text>
-            {pendingTrade && (
-              <View>
-                <Text style={{ color: "#aaa" }}>
-                  {pendingTrade.pair} • {pendingTrade.direction}
-                </Text>
-                <Text
-                  style={{ color: "#f5f5f5", fontWeight: "700", marginTop: 8 }}
-                >
-                  Entry: {pendingTrade.entryPrice}
-                </Text>
-                <Text style={{ color: "#f5f5f5", fontWeight: "700" }}>
-                  SL: {pendingTrade.stopLoss} • TP: {pendingTrade.takeProfit}
-                </Text>
-                <Text style={{ color: "#aaa", marginTop: 8 }}>
-                  R:R:{" "}
-                  {pendingTrade.riskToReward
-                    ? `1:${
-                        pendingTrade.riskToReward.toFixed
-                          ? pendingTrade.riskToReward.toFixed(2)
-                          : pendingTrade.riskToReward
-                      }`
-                    : "—"}
-                </Text>
-                <Text style={{ color: "#aaa" }}>
-                  Confluence:{" "}
-                  {pendingTrade.confluenceScore
-                    ? `${
-                        pendingTrade.confluenceScore.toFixed
-                          ? pendingTrade.confluenceScore.toFixed(0)
-                          : pendingTrade.confluenceScore
-                      }%`
-                    : "—"}
-                </Text>
-                <Text style={{ color: "#aaa" }}>
-                  Account:{" "}
-                  {state.accounts.find((a) => a.id === pendingTrade.accountId)
-                    ?.name || "—"}
-                </Text>
-                <Text style={{ color: "#aaa" }}>
-                  Risk Amount: ${pendingTrade.riskAmount ?? "—"}
-                </Text>
-                <Text style={{ color: "#aaa" }}>
-                  Market: {pendingTrade.marketCondition || "—"}
-                </Text>
+            <View style={{ backgroundColor: "#0d0d0d", borderRadius: 12, padding: 16 }}>
+              <Text style={{ color: "#f5f5f5", fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
+                Confirm Trade
+              </Text>
+              {pendingTrade && (
+                <View>
+                  <Text style={{ color: "#aaa" }}>{pendingTrade.pair} • {pendingTrade.direction}</Text>
+                  <Text style={{ color: "#f5f5f5", fontWeight: "700", marginTop: 8 }}>Entry: {pendingTrade.entryPrice}</Text>
+                  <Text style={{ color: "#f5f5f5", fontWeight: "700" }}>SL: {pendingTrade.stopLoss} • TP: {pendingTrade.takeProfit}</Text>
+                  <Text style={{ color: "#aaa", marginTop: 8 }}>R:R: {pendingTrade.riskToReward ? `1:${pendingTrade.riskToReward.toFixed ? pendingTrade.riskToReward.toFixed(2) : pendingTrade.riskToReward}` : "—"}</Text>
+                  <Text style={{ color: "#aaa" }}>Confluence: {pendingTrade.confluenceScore ? `${pendingTrade.confluenceScore.toFixed ? pendingTrade.confluenceScore.toFixed(0) : pendingTrade.confluenceScore}%` : "—"}</Text>
+                  <Text style={{ color: "#aaa" }}>Account: {state.accounts.find((a) => a.id === pendingTrade.accountId)?.name || "—"}</Text>
+                  <Text style={{ color: "#aaa" }}>Risk Amount: ${pendingTrade.riskAmount ?? "—"}</Text>
+                  <Text style={{ color: "#aaa" }}>Market: {pendingTrade.marketCondition || "—"}</Text>
 
-                {/* Metrics preview */}
-                <View
-                  style={{
-                    marginTop: 12,
-                    paddingTop: 8,
-                    borderTopWidth: 1,
-                    borderTopColor: "#222",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#aaa",
-                      marginBottom: 6,
-                      fontWeight: "700",
-                    }}
-                  >
-                    Projected Impact
-                  </Text>
-                  <Text style={{ color: "#aaa" }}>
-                    Win Rate: {calculateWinRate(state.trades || []).toFixed(1)}%
-                    →{" "}
-                    {pendingTrade.result
-                      ? calculateWinRate([
-                          ...(state.trades || []),
-                          pendingTrade as any,
-                        ]).toFixed(1)
-                      : "—"}
-                    %
-                  </Text>
-                  <Text style={{ color: "#aaa" }}>
-                    Avg R:R: {calculateAverageRR(state.trades || []).toFixed(2)}{" "}
-                    →{" "}
-                    {pendingTrade.riskToReward
-                      ? calculateAverageRR([
-                          ...(state.trades || []),
-                          pendingTrade as any,
-                        ]).toFixed(2)
-                      : "—"}
-                  </Text>
+                  <View style={{ marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#222" }}>
+                    <Text style={{ color: "#aaa", marginBottom: 6, fontWeight: "700" }}>Projected Impact</Text>
+                    <Text style={{ color: "#aaa" }}>Win Rate: {calculateWinRate(state.trades || []).toFixed(1)}% → {pendingTrade.result ? calculateWinRate([...(state.trades || []), pendingTrade as any]).toFixed(1) : "—"}%</Text>
+                    <Text style={{ color: "#aaa" }}>Avg R:R: {calculateAverageRR(state.trades || []).toFixed(2)} → {pendingTrade.riskToReward ? calculateAverageRR([...(state.trades || []), pendingTrade as any]).toFixed(2) : "—"}</Text>
+                  </View>
                 </View>
+              )}
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: "#444", flex: 1, marginRight: 8 }]} onPress={() => setShowConfirmation(false)}>
+                  <Text style={styles.submitButtonText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: "#00d4d4", flex: 1 }]} onPress={() => { try { toast?.show?.("Saving trade...", "info"); } catch (e) {} confirmAndSaveTrade(); }}>
+                  <Text style={styles.submitButtonText}>Confirm & Save</Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 16,
-              }}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  { backgroundColor: "#444", flex: 1, marginRight: 8 },
-                ]}
-                onPress={() => setShowConfirmation(false)}
-              >
-                <Text style={styles.submitButtonText}>Edit</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  { backgroundColor: "#00d4d4", flex: 1 },
-                ]}
-                onPress={confirmAndSaveTrade}
-              >
-                <Text style={styles.submitButtonText}>Confirm & Save</Text>
-              </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       <View style={{ height: 140 }} />
     </ScrollView>
