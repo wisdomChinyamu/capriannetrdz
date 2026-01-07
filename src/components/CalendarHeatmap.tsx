@@ -1,20 +1,33 @@
-import React, { useMemo, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable, Platform, Animated, TouchableOpacity } from 'react-native';
-import { Trade } from '../types';
-import { useTheme } from './ThemeProvider';
-import { breakpoints } from '../theme/theme';
+import React, { useMemo, useState, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+  Platform,
+  Animated,
+  TouchableOpacity,
+} from "react-native";
+import { Trade } from "../types";
+import { useTheme } from "./ThemeProvider";
+import { breakpoints } from "../theme/theme";
 
 interface CalendarHeatmapProps {
   trades: Trade[];
   onDayPress?: (date: Date) => void;
-  theme?: 'dark' | 'light';
+  theme?: "dark" | "light";
 }
 
-export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: CalendarHeatmapProps) {
+export default function CalendarHeatmap({
+  trades,
+  onDayPress,
+  theme = "dark",
+}: CalendarHeatmapProps) {
   const { colors } = useTheme();
   const toDate = (value: any): Date | null => {
     if (!value && value !== 0) return null;
-    if (typeof value?.toDate === 'function') {
+    if (typeof value?.toDate === "function") {
       try {
         const d = value.toDate();
         return isNaN(d.getTime()) ? null : d;
@@ -22,7 +35,7 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
         return null;
       }
     }
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       const d = new Date(value);
       return isNaN(d.getTime()) ? null : d;
     }
@@ -37,13 +50,15 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
 
   const widthAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
-  const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width);
+  const [windowWidth, setWindowWidth] = useState(
+    Dimensions.get("window").width
+  );
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const isTablet = windowWidth >= breakpoints.tablet;
   const isDesktop = windowWidth >= breakpoints.desktop;
 
   React.useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
       setWindowWidth(window.width);
     });
     return () => subscription?.remove();
@@ -52,14 +67,16 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  const localDateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate()
-  ).padStart(2, '0')}`;
+  const localDateKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
 
   const tradesByDate = useMemo(() => {
     const grouped: Record<string, Trade[]> = {};
     trades.forEach((trade) => {
-      const d = toDate((trade as any).tradeTime) || toDate((trade as any).createdAt);
+      const d =
+        toDate((trade as any).tradeTime) || toDate((trade as any).createdAt);
       if (!d) return;
       const dateKey = localDateKey(d);
       if (!grouped[dateKey]) grouped[dateKey] = [];
@@ -70,9 +87,21 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
 
   const blendHex = (a: string, b: string, t: number) => {
     const hexToRgb = (h: string) => {
-      const san = h.replace('#', '');
-      const bigint = parseInt(san.length === 3 ? san.split('').map((c) => c + c).join('') : san, 16);
-      return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+      const san = h.replace("#", "");
+      const bigint = parseInt(
+        san.length === 3
+          ? san
+              .split("")
+              .map((c) => c + c)
+              .join("")
+          : san,
+        16
+      );
+      return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255,
+      };
     };
     const ra = hexToRgb(a);
     const rb = hexToRgb(b);
@@ -83,19 +112,22 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
   };
 
   const getDayColor = (day: number) => {
-    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
     const dayTrades = tradesByDate[dateKey] || [];
 
     if (dayTrades.length === 0) return colors.neutral;
 
     const tradePnL = (t: Trade) => {
       // Prefer explicit pnl
-      if ((t as any).pnl !== undefined && (t as any).pnl !== null) return Number((t as any).pnl) || 0;
+      if ((t as any).pnl !== undefined && (t as any).pnl !== null)
+        return Number((t as any).pnl) || 0;
       // Derive from risk amount and R:R when result exists
       const risk = Math.abs(Number((t as any).riskAmount) || 0);
       const rr = Number((t as any).riskToReward) || 1;
-      if ((t as any).result === 'Win') return Math.round(risk * rr * 100) / 100;
-      if ((t as any).result === 'Loss') return Math.round(-risk * 100) / 100;
+      if ((t as any).result === "Win") return Math.round(risk * rr * 100) / 100;
+      if ((t as any).result === "Loss") return Math.round(-risk * 100) / 100;
       return 0;
     };
 
@@ -103,7 +135,9 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
 
     const maxAbsPnL = Math.max(
       1,
-      ...Object.keys(tradesByDate).map((k) => Math.abs(tradesByDate[k].reduce((s, t) => s + tradePnL(t), 0)))
+      ...Object.keys(tradesByDate).map((k) =>
+        Math.abs(tradesByDate[k].reduce((s, t) => s + tradePnL(t), 0))
+      )
     );
 
     const intensity = Math.min(1, Math.abs(totalPnL) / maxAbsPnL);
@@ -139,7 +173,8 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
 
   // Use scale animations (1 = normal). We animate transform scale so layout width stays percentage-based
   const handleMouseEnter = (day: number, dayKey: string) => {
-    if (!widthAnimations[dayKey]) widthAnimations[dayKey] = new Animated.Value(1);
+    if (!widthAnimations[dayKey])
+      widthAnimations[dayKey] = new Animated.Value(1);
     Animated.timing(widthAnimations[dayKey], {
       toValue: 1.08,
       duration: 160,
@@ -149,7 +184,8 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
   };
 
   const handleMouseLeave = (dayKey: string) => {
-    if (!widthAnimations[dayKey]) widthAnimations[dayKey] = new Animated.Value(1);
+    if (!widthAnimations[dayKey])
+      widthAnimations[dayKey] = new Animated.Value(1);
     Animated.timing(widthAnimations[dayKey], {
       toValue: 1,
       duration: 120,
@@ -221,46 +257,54 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
     const gapsPerRow = 6; // between 7 cells
     const totalGapPx = gapPx * gapsPerRow;
     if (containerWidth && containerWidth > 0) {
-      const percent = ((containerWidth - totalGapPx) / containerWidth) / 7 * 100;
+      const percent =
+        ((containerWidth - totalGapPx) / containerWidth / 7) * 100;
       // reduce cells slightly (approx 1.5%) to give extra breathing room
       return `${Math.max(11, percent - 1.5).toFixed(4)}%`;
     }
-    return '13.9%';
+    return "13.9%";
   })();
 
   return (
     <View
-      style={[styles.container, { position: 'relative', paddingTop: 44 }]}
+      style={[styles.container, { position: "relative", paddingTop: 44 }]}
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
       {/* Header with Navigation */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.monthYear, { color: colors.text }]}>
-            {new Date(year, month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}
+            {new Date(year, month).toLocaleDateString("default", {
+              month: "long",
+              year: "numeric",
+            })}
           </Text>
           <Text style={[styles.subtitle, { color: colors.subtext }]}>
-            {trades.filter(t => {
-              const d = toDate((t as any).createdAt);
-              if (!d) return false;
-              return d.getMonth() === month && d.getFullYear() === year;
-            }).length} trades this month
+            {
+              trades.filter((t) => {
+                const d =
+                  toDate((t as any).tradeTime) || toDate((t as any).createdAt);
+                if (!d) return false;
+                return d.getMonth() === month && d.getFullYear() === year;
+              }).length
+            }{" "}
+            trades this month
           </Text>
         </View>
         <View style={styles.navButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.navButton, { backgroundColor: colors.neutral }]}
             onPress={goToPrevMonth}
           >
             <Text style={styles.navIcon}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.todayButton, { backgroundColor: colors.highlight }]}
             onPress={goToToday}
           >
             <Text style={styles.todayText}>Today</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.navButton, { backgroundColor: colors.neutral }]}
             onPress={goToNextMonth}
           >
@@ -274,19 +318,23 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
       {/* Calendar Grid */}
       <View style={styles.calendar}>
         {/* Day Headers */}
-      <View style={styles.dayHeaderRow}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-          <Text
-                key={`${day}-${idx}`}
-                style={[
-                  styles.dayLabel,
-                  { color: colors.subtext, width: (cellPercent as any), marginRight: 4 },
-                ]}
-              >
-                {day}
-              </Text>
-        ))}
-      </View>
+        <View style={styles.dayHeaderRow}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+            <Text
+              key={`${day}-${idx}`}
+              style={[
+                styles.dayLabel,
+                {
+                  color: colors.subtext,
+                  width: cellPercent as any,
+                  marginRight: 4,
+                },
+              ]}
+            >
+              {day}
+            </Text>
+          ))}
+        </View>
 
         {/* Day Cells */}
         <View style={styles.calendarGrid}>
@@ -295,13 +343,21 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
               {week.map((day, dayIdx) => {
                 const dayKey = `${weekIdx}-${dayIdx}`;
                 const scaleAnim = getWidthAnimatedValue(dayKey);
-                const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+                const isToday =
+                  day === now.getDate() &&
+                  month === now.getMonth() &&
+                  year === now.getFullYear();
 
                 return (
                   <Animated.View
                     key={dayKey}
                     style={[
-                      { width: (cellPercent as any), marginRight: 4, marginBottom: 4, transform: [{ scale: scaleAnim }] },
+                      {
+                        width: cellPercent as any,
+                        marginRight: 4,
+                        marginBottom: 4,
+                        transform: [{ scale: scaleAnim }],
+                      },
                     ]}
                   >
                     <Pressable
@@ -312,39 +368,69 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
                       // @ts-ignore
                       onKeyDown={(e: any) => {
                         if (!day) return;
-                        const k = e?.key || (e?.nativeEvent && e.nativeEvent.key);
-                        if (k === 'Enter' || k === ' ') onDayPress?.(new Date(year, month, day));
+                        const k =
+                          e?.key || (e?.nativeEvent && e.nativeEvent.key);
+                        if (k === "Enter" || k === " ")
+                          onDayPress?.(new Date(year, month, day));
                       }}
                       onFocus={() => day && handleFocus(day, dayKey)}
                       onBlur={() => day && handleBlur(dayKey)}
                       onPressIn={() => day && handleDayCellPressIn(dayKey)}
                       onPressOut={() => day && handleDayCellPressOut(dayKey)}
                       style={({ pressed }) => [
-                      styles.dayCell,
+                        styles.dayCell,
                         {
-                          backgroundColor: day ? getDayColor(day) : 'transparent',
+                          backgroundColor: day
+                            ? getDayColor(day)
+                            : "transparent",
                           opacity: pressed ? 0.9 : 1,
                           borderWidth: isToday ? 2 : focusedDay === day ? 2 : 1,
-                          borderColor: isToday ? colors.highlight : focusedDay === day ? colors.highlight : 'rgba(255,255,255,0.1)',
+                          borderColor: isToday
+                            ? colors.highlight
+                            : focusedDay === day
+                            ? colors.highlight
+                            : "rgba(255,255,255,0.1)",
                         },
                       ]}
-                      onPress={() => day && onDayPress?.(new Date(year, month, day))}
+                      onPress={() =>
+                        day && onDayPress?.(new Date(year, month, day))
+                      }
                       // @ts-ignore
-                      onMouseEnter={() => day && handleMouseEnter(day, dayKey, defaultWidth)}
+                      onMouseEnter={() =>
+                        day && handleMouseEnter(day, dayKey, defaultWidth)
+                      }
                       // @ts-ignore
-                      onMouseLeave={() => day && handleMouseLeave(dayKey, defaultWidth)}
+                      onMouseLeave={() =>
+                        day && handleMouseLeave(dayKey, defaultWidth)
+                      }
                       disabled={!day}
                     >
                       {day && (
-                        <View style={[styles.dayContent, { aspectRatio: 1, width: '100%' }]}>
-                          <Text style={[styles.dayText, { color: colors.text }]}>{day}</Text>
+                        <View
+                          style={[
+                            styles.dayContent,
+                            { aspectRatio: 1, width: "100%" },
+                          ]}
+                        >
+                          <Text
+                            style={[styles.dayText, { color: colors.text }]}
+                          >
+                            {day}
+                          </Text>
                           {(() => {
-                            const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const dateKey = `${year}-${String(
+                              month + 1
+                            ).padStart(2, "0")}-${String(day).padStart(
+                              2,
+                              "0"
+                            )}`;
                             const dayTrades = tradesByDate[dateKey] || [];
                             if (dayTrades.length > 0) {
                               return (
                                 <View style={styles.tradeDot}>
-                                  <Text style={styles.tradeDotText}>{dayTrades.length}</Text>
+                                  <Text style={styles.tradeDotText}>
+                                    {dayTrades.length}
+                                  </Text>
                                 </View>
                               );
                             }
@@ -359,19 +445,36 @@ export default function CalendarHeatmap({ trades, onDayPress, theme = 'dark' }: 
           ))}
         </View>
 
-      {/* Legend */}
-      <View style={styles.legend}>
-        <Text style={[styles.legendTitle, { color: colors.subtext }]}>Activity:</Text>
-        <View style={styles.legendItems}>
-          <View style={[styles.legendBox, { backgroundColor: colors.neutral }]} />
-          <Text style={[styles.legendLabel, { color: colors.subtext }]}>None</Text>
-          <View style={[styles.legendBox, { backgroundColor: colors.profitStart }]} />
-          <Text style={[styles.legendLabel, { color: colors.subtext }]}>Wins</Text>
-          <View style={[styles.legendBox, { backgroundColor: colors.lossStart }]} />
-          <Text style={[styles.legendLabel, { color: colors.subtext }]}>Losses</Text>
+        {/* Legend */}
+        <View style={styles.legend}>
+          <Text style={[styles.legendTitle, { color: colors.subtext }]}>
+            Activity:
+          </Text>
+          <View style={styles.legendItems}>
+            <View
+              style={[styles.legendBox, { backgroundColor: colors.neutral }]}
+            />
+            <Text style={[styles.legendLabel, { color: colors.subtext }]}>
+              None
+            </Text>
+            <View
+              style={[
+                styles.legendBox,
+                { backgroundColor: colors.profitStart },
+              ]}
+            />
+            <Text style={[styles.legendLabel, { color: colors.subtext }]}>
+              Wins
+            </Text>
+            <View
+              style={[styles.legendBox, { backgroundColor: colors.lossStart }]}
+            />
+            <Text style={[styles.legendLabel, { color: colors.subtext }]}>
+              Losses
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
     </View>
   );
 }
@@ -381,63 +484,63 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   monthYear: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 2,
   },
   subtitle: {
     fontSize: 12,
   },
   navButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   navButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   navIcon: {
     fontSize: 20,
-    color: '#f5f5f5',
-    fontWeight: '700',
+    color: "#f5f5f5",
+    fontWeight: "700",
   },
   todayButton: {
     paddingHorizontal: 12,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   todayText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0d0d0d',
+    fontWeight: "700",
+    color: "#0d0d0d",
   },
   tooltip: {
     padding: 12,
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.2)',
+    borderColor: "rgba(0, 212, 212, 0.2)",
   },
   tooltipHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 4,
   },
   tooltipDate: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   tooltipBadge: {
     paddingHorizontal: 8,
@@ -446,94 +549,94 @@ const styles = StyleSheet.create({
   },
   tooltipPnl: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   tooltipTrades: {
     fontSize: 12,
   },
   calendar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 4,
-    justifyContent: 'flex-start',
+    justifyContent: "flex-start",
   },
   dayHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    width: "100%",
     marginBottom: 4,
   },
   calendarGrid: {
-    flexDirection: 'column',
+    flexDirection: "column",
     gap: 4,
-    justifyContent: 'flex-start',
-    width: '100%'
+    justifyContent: "flex-start",
+    width: "100%",
   },
   weekRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   tooltipAbsolute: {
-    position: 'absolute',
+    position: "absolute",
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 212, 0.2)',
+    borderColor: "rgba(0, 212, 212, 0.2)",
     zIndex: 20,
   },
   dayLabel: {
-    width: '14.28%',
-    textAlign: 'center',
+    width: "14.28%",
+    textAlign: "center",
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   dayCell: {
-    width: '100%',
+    width: "100%",
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     minHeight: 38,
   },
   dayContent: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   dayText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   tradeDot: {
-    position: 'absolute',
+    position: "absolute",
     top: -8,
     right: -8,
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#00d4d4',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#00d4d4",
+    justifyContent: "center",
+    alignItems: "center",
   },
   tradeDotText: {
-    color: '#0d0d0d',
+    color: "#0d0d0d",
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 16,
     gap: 8,
   },
   legendTitle: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   legendItems: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   legendBox: {

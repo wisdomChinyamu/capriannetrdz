@@ -26,6 +26,7 @@ import { useTheme } from "../components/ThemeProvider";
 import { useNavigation } from "@react-navigation/native";
 import EquityChart from "../components/EquityChart";
 import WeeklySummaryPanel from "../components/WeeklySummaryPanel";
+import WeeklySummaryPanelSmall from "../components/WeeklySummaryPanelSmall";
 import {
   calculateRiskToReward,
   calculateConfluenceScore,
@@ -485,7 +486,7 @@ export default function DashboardScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ padding: 8 }}
             >
-              <WeeklySummaryPanel trades={filteredTrades} layout="vertical" />
+              <WeeklySummaryPanelSmall trades={filteredTrades} />
             </ScrollView>
           </View>
         )}
@@ -914,7 +915,7 @@ function DayTradesModalAnimated({ visible, date, trades, onClose }: any) {
     <Animated.View
       style={{
         flex: 1,
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         padding: 16,
         transform: [{ translateY }],
         opacity,
@@ -944,10 +945,15 @@ function DayTradesModalAnimated({ visible, date, trades, onClose }: any) {
             if (!date) return null;
             const dateObj = parseDate(date);
             const localDateKey = (d: Date) =>
-              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+                2,
+                "0"
+              )}-${String(d.getDate()).padStart(2, "0")}`;
             const dateKey = dateObj ? localDateKey(dateObj) : "";
             const tradesOnDate = trades.filter((t: any) => {
-              const d = parseDate((t as any).createdAt);
+              const d =
+                parseDate((t as any).tradeTime) ||
+                parseDate((t as any).createdAt);
               return d ? localDateKey(d) === dateKey : false;
             });
 

@@ -1,12 +1,18 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  TouchableOpacity,
+} from "react-native";
 import { useTheme } from "./ThemeProvider";
 import { useAppContext } from "../hooks/useAppContext";
 import { Trade } from "../types";
 
 interface WeeklySummaryPanelProps {
   trades: Trade[];
-  layout?: 'horizontal' | 'vertical';
+  layout?: "horizontal" | "vertical";
 }
 
 function getWeekRanges(
@@ -28,16 +34,17 @@ function getWeekRanges(
 
 export default function WeeklySummaryPanel({
   trades,
-  layout = 'vertical',
+  layout = "vertical",
 }: WeeklySummaryPanelProps) {
   const { colors } = useTheme();
   const { state } = useAppContext();
-  const uiScale = state.uiScale || 'normal';
-  const scaleMultiplier = uiScale === 'small' ? 0.86 : uiScale === 'large' ? 1.12 : 1;
-  
+  const uiScale = state.uiScale || "normal";
+  const scaleMultiplier =
+    uiScale === "small" ? 0.86 : uiScale === "large" ? 1.12 : 1;
+
   const toDate = (value: any): Date | null => {
     if (!value && value !== 0) return null;
-    if (typeof value?.toDate === 'function') {
+    if (typeof value?.toDate === "function") {
       try {
         const d = value.toDate();
         return isNaN(d.getTime()) ? null : d;
@@ -45,7 +52,7 @@ export default function WeeklySummaryPanel({
         return null;
       }
     }
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       const d = new Date(value);
       return isNaN(d.getTime()) ? null : d;
     }
@@ -53,31 +60,37 @@ export default function WeeklySummaryPanel({
     return isNaN(d.getTime()) ? null : d;
   };
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [selectedMonth, setSelectedMonth] = useState({
+    year: now.getFullYear(),
+    month: now.getMonth(),
+  });
   const { year, month } = selectedMonth;
   const weekRanges = getWeekRanges(year, month);
 
   // Group trades by week
   const weeklyStats = weekRanges.map((range, idx) => {
     const tradesInWeek = trades.filter((t) => {
-      const d = toDate((t as any).createdAt);
+      const d = toDate((t as any).tradeTime) || toDate((t as any).createdAt);
       if (!d) return false;
       return d >= range.start && d <= range.end;
     });
-    
-    const wins = tradesInWeek.filter(t => t.result === 'Win').length;
-    const losses = tradesInWeek.filter(t => t.result === 'Loss').length;
-    const winRate = tradesInWeek.length > 0 ? (wins / tradesInWeek.length) * 100 : 0;
-    
+
+    const wins = tradesInWeek.filter((t) => t.result === "Win").length;
+    const losses = tradesInWeek.filter((t) => t.result === "Loss").length;
+    const winRate =
+      tradesInWeek.length > 0 ? (wins / tradesInWeek.length) * 100 : 0;
+
     // Calculate PnL based on result field
     const totalPnL = tradesInWeek.reduce((sum, t) => {
-      if (t.riskAmount && t.result === 'Win') return sum + (t.riskAmount * (t.riskToReward || 1));
-      if (t.riskAmount && t.result === 'Loss') return sum - t.riskAmount;
-      if (!t.riskAmount && t.result === 'Win') return sum + (t.riskToReward || 1);
-      if (!t.riskAmount && t.result === 'Loss') return sum - 1;
+      if (t.riskAmount && t.result === "Win")
+        return sum + t.riskAmount * (t.riskToReward || 1);
+      if (t.riskAmount && t.result === "Loss") return sum - t.riskAmount;
+      if (!t.riskAmount && t.result === "Win")
+        return sum + (t.riskToReward || 1);
+      if (!t.riskAmount && t.result === "Loss") return sum - 1;
       return sum;
     }, 0);
-    
+
     return {
       week: idx + 1,
       range,
@@ -91,7 +104,10 @@ export default function WeeklySummaryPanel({
 
   const totalTrades = weeklyStats.reduce((sum, w) => sum + w.trades, 0);
   const totalPnL = weeklyStats.reduce((sum, w) => sum + w.totalPnL, 0);
-  const bestWeek = weeklyStats.reduce((best, w) => w.totalPnL > best.totalPnL ? w : best, weeklyStats[0]);
+  const bestWeek = weeklyStats.reduce(
+    (best, w) => (w.totalPnL > best.totalPnL ? w : best),
+    weeklyStats[0]
+  );
 
   const goToPrevMonth = () => {
     if (month === 0) {
@@ -114,84 +130,158 @@ export default function WeeklySummaryPanel({
   };
 
   return (
-    <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: 'rgba(0, 212, 212, 0.15)' }]}>
+    <View
+      style={[
+        styles.panel,
+        {
+          backgroundColor: colors.surface,
+          borderColor: "rgba(0, 212, 212, 0.15)",
+        },
+      ]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.text, fontSize: 18 * scaleMultiplier }]}>Weekly Summary</Text>
-          <Text style={[styles.monthName, { color: colors.subtext, fontSize: 13 * scaleMultiplier }]}>
-            {new Date(year, month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}
+          <Text
+            style={[
+              styles.title,
+              { color: colors.text, fontSize: 18 * scaleMultiplier },
+            ]}
+          >
+            Weekly Summary
+          </Text>
+          <Text
+            style={[
+              styles.monthName,
+              { color: colors.subtext, fontSize: 13 * scaleMultiplier },
+            ]}
+          >
+            {new Date(year, month).toLocaleDateString("default", {
+              month: "long",
+              year: "numeric",
+            })}
           </Text>
         </View>
       </View>
 
       {/* Month Navigation */}
       <View style={styles.monthNav}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.navButton, { backgroundColor: colors.neutral }]}
           onPress={goToPrevMonth}
         >
-          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>‹</Text>
+          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>
+            ‹
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.todayButton, { backgroundColor: colors.highlight }]}
           onPress={goToCurrentMonth}
         >
-          <Text style={[styles.todayText, { color: colors.background, fontSize: 13 * scaleMultiplier }]}>Today</Text>
+          <Text
+            style={[
+              styles.todayText,
+              { color: colors.background, fontSize: 13 * scaleMultiplier },
+            ]}
+          >
+            Today
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.navButton, { backgroundColor: colors.neutral }]}
           onPress={goToNextMonth}
         >
-          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>›</Text>
+          <Text style={[styles.navIcon, { fontSize: 16 * scaleMultiplier }]}>
+            ›
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Month Overview */}
-      <View style={[styles.overviewCard, { backgroundColor: 'rgba(0, 212, 212, 0.05)', borderColor: 'rgba(0, 212, 212, 0.2)' }]}>
+      <View
+        style={[
+          styles.overviewCard,
+          {
+            backgroundColor: "rgba(0, 212, 212, 0.05)",
+            borderColor: "rgba(0, 212, 212, 0.2)",
+          },
+        ]}
+      >
         <View style={styles.overviewRow}>
           <View style={styles.overviewItem}>
-            <Text style={[styles.overviewLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>Trades</Text>
-            <Text style={[styles.overviewValue, { color: colors.text, fontSize: 20 * scaleMultiplier }]}>{totalTrades}</Text>
+            <Text
+              style={[
+                styles.overviewLabel,
+                { color: colors.subtext, fontSize: 11 * scaleMultiplier },
+              ]}
+            >
+              Trades
+            </Text>
+            <Text
+              style={[
+                styles.overviewValue,
+                { color: colors.text, fontSize: 20 * scaleMultiplier },
+              ]}
+            >
+              {totalTrades}
+            </Text>
           </View>
           <View style={styles.overviewDivider} />
           <View style={styles.overviewItem}>
-            <Text style={[styles.overviewLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>P&L</Text>
-            <Text style={[
-              styles.overviewValue, 
-              { color: totalPnL >= 0 ? colors.profitEnd : colors.lossEnd, fontSize: 20 * scaleMultiplier }
-            ]}>
-              {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(1)}
+            <Text
+              style={[
+                styles.overviewLabel,
+                { color: colors.subtext, fontSize: 11 * scaleMultiplier },
+              ]}
+            >
+              P&L
+            </Text>
+            <Text
+              style={[
+                styles.overviewValue,
+                {
+                  color: totalPnL >= 0 ? colors.profitEnd : colors.lossEnd,
+                  fontSize: 20 * scaleMultiplier,
+                },
+              ]}
+            >
+              {totalPnL >= 0 ? "+" : ""}
+              {totalPnL.toFixed(1)}
             </Text>
           </View>
         </View>
       </View>
 
       {/* Weekly Boxes */}
-      <View style={[styles.weeksContainer, layout === 'horizontal' ? styles.weeksContainerHorizontal : null]}>
+      <View
+        style={[
+          styles.weeksContainer,
+          layout === "horizontal" ? styles.weeksContainerHorizontal : null,
+        ]}
+      >
         {weeklyStats.map((w) => {
           const isCurrentWeek = now >= w.range.start && now <= w.range.end;
           const isEmpty = w.trades === 0;
-          
+
           return (
             <View
               key={w.week}
               style={[
                 styles.weekBox,
-                layout === 'horizontal' ? styles.weekBoxHorizontal : null,
+                layout === "horizontal" ? styles.weekBoxHorizontal : null,
                 {
-                  backgroundColor: isEmpty 
-                    ? colors.neutral 
+                  backgroundColor: isEmpty
+                    ? colors.neutral
                     : w.totalPnL > 0
-                    ? 'rgba(76, 175, 80, 0.15)'
+                    ? "rgba(76, 175, 80, 0.15)"
                     : w.totalPnL < 0
-                    ? 'rgba(244, 67, 54, 0.15)'
-                    : 'rgba(255, 165, 0, 0.15)',
+                    ? "rgba(244, 67, 54, 0.15)"
+                    : "rgba(255, 165, 0, 0.15)",
                   borderWidth: 1 * scaleMultiplier,
-                  borderColor: isCurrentWeek 
-                    ? colors.highlight 
+                  borderColor: isCurrentWeek
+                    ? colors.highlight
                     : isEmpty
-                    ? 'rgba(255, 255, 255, 0.05)'
+                    ? "rgba(255, 255, 255, 0.05)"
                     : w.totalPnL > 0
                     ? colors.profitEnd
                     : w.totalPnL < 0
@@ -202,57 +292,157 @@ export default function WeeklySummaryPanel({
             >
               <View style={styles.weekHeader}>
                 <View style={styles.weekLabelContainer}>
-                  <Text style={[styles.weekLabel, { color: colors.text, fontSize: 14 * scaleMultiplier }]}>
+                  <Text
+                    style={[
+                      styles.weekLabel,
+                      { color: colors.text, fontSize: 14 * scaleMultiplier },
+                    ]}
+                  >
                     Week {w.week}
                   </Text>
                   {isCurrentWeek && (
-                    <View style={[styles.currentBadge, { backgroundColor: colors.highlight }]}>
-                      <Text style={[styles.currentBadgeText, { color: colors.background, fontSize: 9 * scaleMultiplier }]}>Now</Text>
+                    <View
+                      style={[
+                        styles.currentBadge,
+                        { backgroundColor: colors.highlight },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.currentBadgeText,
+                          {
+                            color: colors.background,
+                            fontSize: 9 * scaleMultiplier,
+                          },
+                        ]}
+                      >
+                        Now
+                      </Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.weekDate, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>
+                <Text
+                  style={[
+                    styles.weekDate,
+                    { color: colors.subtext, fontSize: 11 * scaleMultiplier },
+                  ]}
+                >
                   {w.range.start.getDate()}-{w.range.end.getDate()}
                 </Text>
               </View>
 
               {isEmpty ? (
                 <View style={styles.emptyWeek}>
-                  <Text style={[styles.emptyText, { color: colors.subtext, fontSize: 12 * scaleMultiplier }]}>No trades</Text>
+                  <Text
+                    style={[
+                      styles.emptyText,
+                      { color: colors.subtext, fontSize: 12 * scaleMultiplier },
+                    ]}
+                  >
+                    No trades
+                  </Text>
                 </View>
               ) : (
                 <>
                   <View style={styles.weekPnLContainer}>
-                    <Text style={[
-                      styles.weekPnL, 
-                      { color: w.totalPnL >= 0 ? colors.profitEnd : colors.lossEnd, fontSize: 24 * scaleMultiplier }
-                    ]}>
-                      {w.totalPnL >= 0 ? '+' : ''}{w.totalPnL.toFixed(1)}R
+                    <Text
+                      style={[
+                        styles.weekPnL,
+                        {
+                          color:
+                            w.totalPnL >= 0 ? colors.profitEnd : colors.lossEnd,
+                          fontSize: 24 * scaleMultiplier,
+                        },
+                      ]}
+                    >
+                      {w.totalPnL >= 0 ? "+" : ""}
+                      {w.totalPnL.toFixed(1)}R
                     </Text>
                     <View style={styles.weekPnLIndicator}>
-                      <Text style={[styles.weekPnLIcon, { fontSize: 16 * scaleMultiplier }]}>
-                        {w.totalPnL > 0 ? '📈' : w.totalPnL < 0 ? '📉' : '—'}
+                      <Text
+                        style={[
+                          styles.weekPnLIcon,
+                          { fontSize: 16 * scaleMultiplier },
+                        ]}
+                      >
+                        {w.totalPnL > 0 ? "📈" : w.totalPnL < 0 ? "📉" : "—"}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.weekStats}>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>Trades</Text>
-                      <Text style={[styles.weekStatValue, { color: colors.text, fontSize: 13 * scaleMultiplier }]}>{w.trades}</Text>
+                      <Text
+                        style={[
+                          styles.weekStatLabel,
+                          {
+                            color: colors.subtext,
+                            fontSize: 10 * scaleMultiplier,
+                          },
+                        ]}
+                      >
+                        Trades
+                      </Text>
+                      <Text
+                        style={[
+                          styles.weekStatValue,
+                          {
+                            color: colors.text,
+                            fontSize: 13 * scaleMultiplier,
+                          },
+                        ]}
+                      >
+                        {w.trades}
+                      </Text>
                     </View>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>W/L</Text>
-                      <Text style={[styles.weekStatValue, { color: colors.text, fontSize: 13 * scaleMultiplier }]}>
+                      <Text
+                        style={[
+                          styles.weekStatLabel,
+                          {
+                            color: colors.subtext,
+                            fontSize: 10 * scaleMultiplier,
+                          },
+                        ]}
+                      >
+                        W/L
+                      </Text>
+                      <Text
+                        style={[
+                          styles.weekStatValue,
+                          {
+                            color: colors.text,
+                            fontSize: 13 * scaleMultiplier,
+                          },
+                        ]}
+                      >
                         {w.wins}/{w.losses}
                       </Text>
                     </View>
                     <View style={styles.weekStatItem}>
-                      <Text style={[styles.weekStatLabel, { color: colors.subtext, fontSize: 10 * scaleMultiplier }]}>Win %</Text>
-                      <Text style={[
-                        styles.weekStatValue, 
-                        { color: w.winRate >= 50 ? colors.profitEnd : colors.lossEnd, fontSize: 13 * scaleMultiplier }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.weekStatLabel,
+                          {
+                            color: colors.subtext,
+                            fontSize: 10 * scaleMultiplier,
+                          },
+                        ]}
+                      >
+                        Win %
+                      </Text>
+                      <Text
+                        style={[
+                          styles.weekStatValue,
+                          {
+                            color:
+                              w.winRate >= 50
+                                ? colors.profitEnd
+                                : colors.lossEnd,
+                            fontSize: 13 * scaleMultiplier,
+                          },
+                        ]}
+                      >
                         {w.winRate.toFixed(0)}%
                       </Text>
                     </View>
@@ -266,11 +456,35 @@ export default function WeeklySummaryPanel({
 
       {/* Best Week Highlight */}
       {bestWeek && bestWeek.trades > 0 && (
-        <View style={[styles.bestWeekCard, { backgroundColor: 'rgba(76, 175, 80, 0.1)', borderColor: colors.profitEnd }]}>
-          <Text style={[styles.bestWeekIcon, { fontSize: 24 * scaleMultiplier }]}>🏆</Text>
+        <View
+          style={[
+            styles.bestWeekCard,
+            {
+              backgroundColor: "rgba(76, 175, 80, 0.1)",
+              borderColor: colors.profitEnd,
+            },
+          ]}
+        >
+          <Text
+            style={[styles.bestWeekIcon, { fontSize: 24 * scaleMultiplier }]}
+          >
+            🏆
+          </Text>
           <View style={styles.bestWeekInfo}>
-            <Text style={[styles.bestWeekLabel, { color: colors.subtext, fontSize: 11 * scaleMultiplier }]}>Best Week</Text>
-            <Text style={[styles.bestWeekValue, { color: colors.profitEnd, fontSize: 14 * scaleMultiplier }]}>
+            <Text
+              style={[
+                styles.bestWeekLabel,
+                { color: colors.subtext, fontSize: 11 * scaleMultiplier },
+              ]}
+            >
+              Best Week
+            </Text>
+            <Text
+              style={[
+                styles.bestWeekValue,
+                { color: colors.profitEnd, fontSize: 14 * scaleMultiplier },
+              ]}
+            >
               Week {bestWeek.week}: +{bestWeek.totalPnL.toFixed(1)}R
             </Text>
           </View>
@@ -302,7 +516,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   monthNav: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 16,
   },
@@ -310,22 +524,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   navIcon: {
     fontSize: 16,
-    color: '#f5f5f5',
-    fontWeight: '700',
+    color: "#f5f5f5",
+    fontWeight: "700",
   },
   todayButton: {
     flex: 2,
     paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   todayText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   overviewCard: {
     borderRadius: 8,
@@ -334,36 +548,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   overviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   overviewItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   overviewLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   overviewValue: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   overviewDivider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     marginHorizontal: 12,
   },
   weeksContainer: {
     gap: 12,
   },
   weeksContainerHorizontal: {
-    flexDirection: 'row',
-    overflow: 'hidden',
+    flexDirection: "row",
+    overflow: "hidden",
   },
   weekBox: {
     borderRadius: 10,
@@ -375,14 +589,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   weekHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   weekLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   weekLabel: {
@@ -396,24 +610,24 @@ const styles = StyleSheet.create({
   },
   currentBadgeText: {
     fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
   weekDate: {
     fontSize: 11,
   },
   emptyWeek: {
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 12,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   weekPnLContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 10,
   },
   weekPnL: {
@@ -424,15 +638,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   weekPnLIcon: {
     fontSize: 16,
   },
   weekStats: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   weekStatItem: {
@@ -440,16 +654,16 @@ const styles = StyleSheet.create({
   },
   weekStatLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   weekStatValue: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   bestWeekCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
@@ -464,11 +678,11 @@ const styles = StyleSheet.create({
   },
   bestWeekLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   bestWeekValue: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
