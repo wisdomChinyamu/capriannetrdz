@@ -11,6 +11,7 @@ export interface AppState {
   routines: Routine[]; // Add routines property
   accounts: TradingAccount[]; // Add accounts property
   uiScale: 'small' | 'normal' | 'large';
+  streakResetThreshold: number;
 }
 
 export type AppAction =
@@ -29,7 +30,8 @@ export type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_ROUTINES'; payload: Routine[] } // Add SET_ROUTINES action
   | { type: 'SET_ACCOUNTS'; payload: TradingAccount[] } // Add SET_ACCOUNTS action
-  | { type: 'SET_UI_SCALE'; payload: 'small' | 'normal' | 'large' };
+  | { type: 'SET_UI_SCALE'; payload: 'small' | 'normal' | 'large' }
+  | { type: 'SET_STREAK_RESET_THRESHOLD'; payload: number };
 
 const initialState: AppState = {
   user: null,
@@ -41,6 +43,7 @@ const initialState: AppState = {
   routines: [], // Initialize routines
   accounts: [], // Initialize accounts
   uiScale: 'normal',
+  streakResetThreshold: 1000,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -108,6 +111,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, accounts: action.payload };
     case 'SET_UI_SCALE':
       return { ...state, uiScale: action.payload };
+    case 'SET_STREAK_RESET_THRESHOLD':
+      return { ...state, streakResetThreshold: action.payload };
     default:
       return state;
   }

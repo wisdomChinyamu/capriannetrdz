@@ -25,8 +25,27 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
     Math.min(900, Math.max(320, screenWidth - 48))
   );
   const height = 240;
-  const basePadding = 32;
+  const basePadding = 40;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  // Helper to parse Firestore Timestamp / number / string / Date
+  const parseDate = (value: any): Date | null => {
+    if (!value && value !== 0) return null;
+    if (typeof value?.toDate === "function") {
+      try {
+        const d = value.toDate();
+        return isNaN(d.getTime()) ? null : d;
+      } catch {
+        return null;
+      }
+    }
+    if (typeof value === "number") {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
   // Calculate equity curve
   let equity = 0;
@@ -50,9 +69,9 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
     }
     // Prefer `tradeTime` (when trade occurred) falling back to `createdAt` (entry time)
     const rawDate = (trade as any).tradeTime ?? (trade as any).createdAt;
-    const d = new Date(rawDate);
+    const pd = parseDate(rawDate) || new Date();
     equityPoints.push({
-      date: isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString(),
+      date: pd.toLocaleDateString(),
       value: equity,
     });
   });
@@ -171,25 +190,29 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
             height={chartHeight}
             fill="transparent"
             onPress={() => setSelectedIndex(null)}
-            onMouseLeave={Platform.OS === "web" ? (() => setSelectedIndex(null)) : undefined}
-            onMouseMove={Platform.OS === "web" ? (e: any) => {
-              try {
-                const offsetX = e.nativeEvent.offsetX ?? e.nativeEvent.clientX;
-                const targetWidth = (e.nativeEvent.target && e.nativeEvent.target.clientWidth) || e.currentTarget?.clientWidth || 1;
-                const ratio = offsetX / targetWidth;
-                const xInView = padding + ratio * chartWidth;
-                let nearest = 0;
-                let minDist = Infinity;
-                mappedPoints.forEach((pt, idx) => {
-                  const d = Math.abs(pt.x - xInView);
-                  if (d < minDist) {
-                    minDist = d;
-                    nearest = idx;
-                  }
-                });
-                setSelectedIndex(nearest);
-              } catch (err) {}
-            } : undefined}
+            {...(Platform.OS === "web"
+              ? ({
+                  onMouseLeave: () => setSelectedIndex(null),
+                  onMouseMove: (e: any) => {
+                    try {
+                      const offsetX = e.nativeEvent.offsetX ?? e.nativeEvent.clientX;
+                      const targetWidth = (e.nativeEvent.target && e.nativeEvent.target.clientWidth) || e.currentTarget?.clientWidth || 1;
+                      const ratio = offsetX / targetWidth;
+                      const xInView = padding + ratio * chartWidth;
+                      let nearest = 0;
+                      let minDist = Infinity;
+                      mappedPoints.forEach((pt, idx) => {
+                        const d = Math.abs(pt.x - xInView);
+                        if (d < minDist) {
+                          minDist = d;
+                          nearest = idx;
+                        }
+                      });
+                      setSelectedIndex(nearest);
+                    } catch (err) {}
+                  },
+                } as any)
+              : ({} as any))}
           />
 
           {/* Grid lines */}
@@ -253,10 +276,14 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
                   stroke="#0d0d0d"
                   strokeWidth={isLast ? 2.5 : 1.5}
                   accessible
-                  accessibilityLabel={`Equity ${p.value.toFixed(2)} on ${
-                    p.date
-                  }`}
+                  accessibilityLabel={`Equity ${p.value.toFixed(2)} on ${p.date}`}
                   onPress={() => setSelectedIndex(index)}
+                  {...(Platform.OS === "web"
+                    ? ({
+                        onMouseEnter: () => setSelectedIndex(index),
+                        onMouseMove: () => setSelectedIndex(index),
+                      } as any)
+                    : ({} as any))}
                 />
               </G>
             );
@@ -264,14 +291,17 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
 
           {selectedIndex !== null && mappedPoints[selectedIndex] && (() => {
             const p = mappedPoints[selectedIndex];
-            const tipW = 140;
-            const tipH = 40;
-            const margin = 8;
+            const prev = mappedPoints[selectedIndex - 1];
+            const delta = prev ? p.value - prev.value : 0;
+            const tipW = 160;
+            const tipH = 48;
+            const margin = 12;
             const x = Math.max(
               padding + margin,
               Math.min(internalWidth - padding - tipW - margin, p.x - tipW / 2)
             );
-            const y = Math.max(padding, p.y - tipH - 8);
+            const y = Math.max(padding, Math.min(p.y - tipH - 8, height - padding - tipH - margin));
+            const deltaStr = `${delta >= 0 ? "+" : ""}${Math.abs(delta) >= 1000 || Math.abs(delta) <= -1000 ? delta.toLocaleString() : Math.abs(delta).toFixed(2)}`;
             return (
               <G key={`tooltip-${selectedIndex}`}>
                 <Rect
@@ -281,14 +311,14 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
                   height={tipH}
                   rx={8}
                   fill="#0d0d0d"
-                  opacity={0.95}
+                  opacity={0.98}
                   stroke="#00d4d4"
                   strokeWidth={1}
                 />
-                <SvgText x={x + 10} y={y + 16} fontSize="12" fill="#fff" fontFamily={fontFamily}>
-                  {p.value >= 1000 || p.value <= -1000 ? p.value.toLocaleString() : p.value.toFixed(2)}
+                <SvgText x={x + 10} y={y + 18} fontSize="13" fill="#fff" fontFamily={fontFamily}>
+                  {delta === 0 ? (p.value >= 1000 || p.value <= -1000 ? p.value.toLocaleString() : p.value.toFixed(2)) : deltaStr}
                 </SvgText>
-                <SvgText x={x + 10} y={y + 30} fontSize="10" fill="#9aa" fontFamily={fontFamily}>
+                <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
                   {p.date}
                 </SvgText>
               </G>

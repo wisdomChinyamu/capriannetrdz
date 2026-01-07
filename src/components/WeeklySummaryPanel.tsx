@@ -26,6 +26,9 @@ function getWeekRanges(
   while (day <= daysInMonth) {
     const start = new Date(year, month, day);
     const end = new Date(year, month, Math.min(day + 6, daysInMonth));
+    // Make start at start of day and end at end of day so comparisons are inclusive
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
     weeks.push({ start, end });
     day += 7;
   }

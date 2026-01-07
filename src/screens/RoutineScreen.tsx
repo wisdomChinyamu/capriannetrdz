@@ -22,6 +22,7 @@ import {
   getRoutines,
   isScheduledDay,
   countScheduledDaysBetween,
+  STREAK_RESET_THRESHOLD,
 } from "../services/firebaseService";
 import { Routine, RoutineItem } from "../types";
 import ConfirmModal from "../components/ConfirmModal";
@@ -107,8 +108,8 @@ export default function RoutineScreen() {
           activeRoutine.schedule
         );
 
-        // If user missed one or more scheduled days (per the routine schedule), reset streak
-        if (scheduledMissed > 1) {
+        // If user missed scheduled days beyond the configured threshold, reset streak
+        if (scheduledMissed > STREAK_RESET_THRESHOLD) {
           try {
             await updateRoutine(activeRoutine.id, {
               streak: 0,

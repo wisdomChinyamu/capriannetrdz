@@ -21,6 +21,7 @@ import {
   updateStrategy,
   deleteStrategy,
 } from "../services/firebaseService";
+import { setStreakResetThreshold } from "../services/firebaseService";
 import { logout } from "../services/firebaseService";
 import ConfirmModal from "../components/ConfirmModal";
 
@@ -48,6 +49,17 @@ export default function SettingsScreen() {
 
   const handleUiScaleChange = (scale: "small" | "normal" | "large") => {
     dispatch({ type: "SET_UI_SCALE", payload: scale });
+  };
+
+  const handleStreakThresholdChange = (value: string) => {
+    const n = Number(value);
+    if (isNaN(n) || n < 0) return;
+    dispatch({ type: "SET_STREAK_RESET_THRESHOLD", payload: n });
+    try {
+      setStreakResetThreshold(n);
+    } catch (e) {
+      console.warn("Failed to set streak threshold in service", e);
+    }
   };
 
   useEffect(() => {
@@ -295,6 +307,22 @@ export default function SettingsScreen() {
               Large
             </Text>
           </TouchableOpacity>
+        </View>
+      </View>
+      {/* Behavior Settings */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>⚙️ Behavior</Text>
+        <Text style={[styles.sectionDescription, { color: colors.subtext, marginBottom: 8 }]}>Streak reset policy</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TextInput
+            keyboardType="numeric"
+            value={String(appContextState.streakResetThreshold || 1000)}
+            onChangeText={handleStreakThresholdChange}
+            style={[styles.input, { backgroundColor: colors.surface, color: colors.text, flex: 1 }]}
+          />
+          <View style={[styles.createButton, { backgroundColor: colors.highlight }]}>
+            <Text style={[styles.createButtonText, { color: colors.background }]}>Save</Text>
+          </View>
         </View>
       </View>
 

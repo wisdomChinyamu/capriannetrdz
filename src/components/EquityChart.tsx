@@ -26,10 +26,9 @@ export default function EquityChart({
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(
     null
   );
-
-  // Use a scalable viewBox so the SVG fits its container without overflowing.
-  const internalWidth = 800;
-  const padding = { top: 20, right: 40, bottom: 30, left: 40 };
+  // Measure container width so the chart fills the card area responsively.
+  const [internalWidth, setInternalWidth] = React.useState<number>(800);
+  const padding = { top: 24, right: 48, bottom: 36, left: 48 };
   const chartWidth = internalWidth - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -79,7 +78,13 @@ export default function EquityChart({
   }
 
   return (
-    <View style={{ width: "100%" }}>
+    <View
+      style={{ width: "100%" }}
+      onLayout={(e: any) => {
+        const w = Math.max(320, Math.min(1200, e.nativeEvent.layout.width));
+        if (Math.abs(w - internalWidth) > 1) setInternalWidth(w);
+      }}
+    >
       <Svg
         width={"100%"}
         height={height}
@@ -159,6 +164,12 @@ export default function EquityChart({
               accessible
               accessibilityLabel={`Equity ${series[i].value.toFixed(2)} on ${series[i].date}`}
               onPress={() => setSelectedIndex(i)}
+              {...(Platform.OS === "web"
+                ? ({
+                    onMouseEnter: () => setSelectedIndex(i),
+                    onMouseMove: () => setSelectedIndex(i),
+                  } as any)
+                : ({} as any))}
             />
           </G>
         ))}
@@ -166,14 +177,17 @@ export default function EquityChart({
         {/* Tooltip */}
         {selectedIndex !== null && points[selectedIndex] && (() => {
           const p = points[selectedIndex];
-          const tipW = 140;
-          const tipH = 40;
-          const margin = 8;
+          const prev = points[selectedIndex - 1];
+          const delta = prev ? series[selectedIndex].value - series[selectedIndex - 1].value : 0;
+          const tipW = 160;
+          const tipH = 48;
+          const margin = 12;
           const x = Math.max(
             padding.left + margin,
             Math.min(padding.left + chartWidth - tipW - margin, p.x - tipW / 2)
           );
-          const y = Math.max(padding.top, p.y - tipH - 8);
+          const y = Math.max(padding.top, Math.min(p.y - tipH - 8, padding.top + chartHeight - tipH - margin));
+          const deltaStr = `${delta >= 0 ? "+" : ""}${Math.abs(delta) >= 1000 ? delta.toLocaleString() : Math.abs(delta).toFixed(2)}`;
           return (
             <G key={`tooltip-${selectedIndex}`}>
               <Rect
@@ -183,14 +197,14 @@ export default function EquityChart({
                 height={tipH}
                 rx={8}
                 fill="#0d0d0d"
-                opacity={0.95}
+                opacity={0.98}
                 stroke={colors.highlight}
                 strokeWidth={1}
               />
-              <SvgText x={x + 10} y={y + 16} fontSize="12" fill="#fff" fontFamily={fontFamily}>
-                {series[selectedIndex].value.toFixed(2)}
+              <SvgText x={x + 10} y={y + 18} fontSize="13" fill="#fff" fontFamily={fontFamily}>
+                {delta === 0 ? series[selectedIndex].value.toFixed(2) : deltaStr}
               </SvgText>
-              <SvgText x={x + 10} y={y + 30} fontSize="10" fill="#9aa" fontFamily={fontFamily}>
+              <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
                 {series[selectedIndex].date}
               </SvgText>
             </G>

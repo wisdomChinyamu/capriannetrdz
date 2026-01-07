@@ -250,4 +250,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
 });

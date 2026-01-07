@@ -914,6 +914,15 @@ export function isScheduledDay(
   return day === 0 || day === 6;
 }
 
+// How many scheduled-days gap to tolerate before considering the streak broken.
+// Default of 1 means: lastCompleted -> today with exactly 1 scheduled-day gap is treated as consecutive.
+// Module-level streak reset threshold. Default set to 1000 (can be overridden via settings).
+export let STREAK_RESET_THRESHOLD = 1000;
+
+export function setStreakResetThreshold(v: number) {
+  STREAK_RESET_THRESHOLD = Number(v) || 0;
+}
+
 // Count how many scheduled days occur in the (startDate, endDate] range
 export function countScheduledDaysBetween(
   startDate: Date,
@@ -1136,7 +1145,7 @@ export async function updateRoutineItem(
           routine.schedule || "both"
         );
 
-        if (scheduledCount === 1) {
+        if (scheduledCount === STREAK_RESET_THRESHOLD) {
           newStreak = (routine.streak || 0) + 1;
         } else if (scheduledCount === 0) {
           newStreak = routine.streak || 1;
@@ -1149,15 +1158,35 @@ export async function updateRoutineItem(
       updateData.lastCompleted = Timestamp.fromDate(today);
     }
 
-    // If items were all completed before and now are not, decrement streak
+    // If items were all completed before and now are not, consider decrementing streak
     const becameIncomplete = !allCompletedNow && wereAllCompletedBefore;
     if (becameIncomplete) {
-      // Decrement streak by 1 but not below 0
-      const currentStreak = routine.streak || 0;
-      const newStreak = Math.max(0, currentStreak - 1);
-      updateData.streak = newStreak;
-      // Clear lastCompleted so next completion will set appropriately
-      updateData.lastCompleted = null;
+      // Only decrement if the routine was marked completed today (i.e. user is undoing today's completion)
+      const lastCompletedTs = routine.lastCompleted
+        ? routine.lastCompleted.toDate
+          ? routine.lastCompleted.toDate()
+          : new Date(routine.lastCompleted)
+        : null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let shouldDecrement = false;
+      if (lastCompletedTs) {
+        const lastCompDate = new Date(lastCompletedTs);
+        lastCompDate.setHours(0, 0, 0, 0);
+        if (lastCompDate.getTime() === today.getTime()) {
+          shouldDecrement = true;
+        }
+      }
+
+      if (shouldDecrement) {
+        const currentStreak = routine.streak || 0;
+        const newStreak = Math.max(0, currentStreak - 1);
+        updateData.streak = newStreak;
+        // Clear lastCompleted so next completion will set appropriately
+        updateData.lastCompleted = null;
+      }
+      // If lastCompleted was not today, do not change the streak (editing historical items should not affect streak)
     }
 
     await updateDoc(routineRef, updateData);
@@ -1224,7 +1253,11 @@ export async function completeRoutine(routineId: string) {
         routine.schedule || "both"
       );
 
-      if (scheduledCount === 1) {
+      // If scheduledCount equals the configured threshold we treat this as
+      // consecutive (increase streak). If it's 0, it's the same day (keep
+      // previous streak). If it's greater than the threshold, treat as a
+      // missed scheduled day(s) and start a new streak (1).
+      if (scheduledCount === STREAK_RESET_THRESHOLD) {
         newStreak = (routine.streak || 0) + 1;
       } else if (scheduledCount === 0) {
         newStreak = routine.streak || 1;
