@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { useAppContext } from "../hooks/useAppContext";
 import EquityCurveChart from "../components/EquityCurveChart";
+import StrategyWinRateList from "../components/StrategyWinRateList";
+import { getUserStrategies } from "../services/firebaseService";
 import AccountDropdown from "../components/AccountDropdown";
 import WinRatePieChart from "../components/WinRatePieChart";
 import PerformanceByPairChart from "../components/PerformanceByPairChart";
@@ -25,6 +27,22 @@ export default function AnalyticsScreen() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
   const [accountModalVisible, setAccountModalVisible] =
     useState<boolean>(false);
+  const [strategies, setStrategies] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (state.user?.uid) {
+          const s = await getUserStrategies(state.user.uid);
+          if (mounted) setStrategies(s || []);
+        }
+      } catch (e) {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [state.user]);
 
   const filteredTrades = React.useMemo(() => {
     const base = state.trades || [];
@@ -33,6 +51,18 @@ export default function AnalyticsScreen() {
       (t: any) => String(t.accountId || "") === String(selectedAccountId)
     );
   }, [state.trades, selectedAccountId]);
+
+  const accountStartingBalance = React.useMemo(() => {
+    if (!selectedAccountId || selectedAccountId === "all") {
+      // sum starting balances when viewing all accounts
+      return (state.accounts || []).reduce(
+        (s, a) => s + Number(a.startingBalance || 0),
+        0
+      );
+    }
+    const acc = (state.accounts || []).find((a) => a.id === selectedAccountId);
+    return acc ? Number(acc.startingBalance || 0) : 0;
+  }, [state.accounts, selectedAccountId]);
 
   const metrics = {
     winRate: calculateWinRate(filteredTrades),
@@ -196,7 +226,11 @@ export default function AnalyticsScreen() {
               <Text style={styles.chartBadgeText}>Cumulative P&L</Text>
             </View>
           </View>
-          <EquityCurveChart trades={filteredTrades} />
+            <EquityCurveChart
+              trades={filteredTrades}
+              startingBalance={accountStartingBalance}
+              height={340}
+            />
         </View>
 
         <View style={styles.chartCard}>
@@ -228,6 +262,11 @@ export default function AnalyticsScreen() {
             </TouchableOpacity>
           </View>
           <PerformanceByPairChart trades={filteredTrades} />
+        </View>
+
+        {/* Strategy win rate */}
+        <View style={styles.chartCard}>
+          <StrategyWinRateList trades={filteredTrades} strategies={strategies} />
         </View>
       </View>
 

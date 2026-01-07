@@ -37,8 +37,9 @@ function getWeekRanges(year: number, month: number) {
   const weeks: { start: Date; end: Date }[] = [];
   let day = 1;
   while (day <= daysInMonth) {
-    const start = new Date(year, month, day);
-    const end = new Date(year, month, Math.min(day + 6, daysInMonth));
+    const start = new Date(year, month, day, 0, 0, 0, 0);
+    const endDay = Math.min(day + 6, daysInMonth);
+    const end = new Date(year, month, endDay, 23, 59, 59, 999);
     weeks.push({ start, end });
     day += 7;
   }

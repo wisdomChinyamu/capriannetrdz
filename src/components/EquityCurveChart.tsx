@@ -17,14 +17,20 @@ import { Trade } from "../types";
 
 interface EquityCurveChartProps {
   trades: Trade[];
+  startingBalance?: number;
+  height?: number;
 }
 
-export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
+export default function EquityCurveChart({
+  trades,
+  startingBalance = 0,
+  height: propHeight,
+}: EquityCurveChartProps) {
   const screenWidth = Dimensions.get("window").width;
   const [internalWidth, setInternalWidth] = useState(
-    Math.min(900, Math.max(320, screenWidth - 48))
+    Math.min(1200, Math.max(320, screenWidth - 48))
   );
-  const height = 240;
+  const height = typeof propHeight === "number" ? propHeight : 320;
   const basePadding = 40;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -47,8 +53,9 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
     return isNaN(d.getTime()) ? null : d;
   };
 
-  // Calculate equity curve
-  let equity = 0;
+  // Calculate equity curve (account balance over time)
+  const startingBalance = typeof (arguments[0] as any)?.startingBalance === "number" ? (arguments[0] as any).startingBalance : 0;
+  let equity = startingBalance;
   const equityPoints: { date: string; value: number }[] = [];
 
   trades.forEach((trade) => {
@@ -75,6 +82,17 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
       value: equity,
     });
   });
+
+  // Add a starting baseline point (slightly before the first trade) so chart shows starting balance
+  if (equityPoints.length > 0) {
+    try {
+      const firstDate = new Date(equityPoints[0].date);
+      const baselineTime = new Date(Math.max(0, firstDate.getTime() - 1));
+      if (Math.abs(equityPoints[0].value - startingBalance) > 0.0001) {
+        equityPoints.unshift({ date: new Date(baselineTime).toISOString(), value: startingBalance });
+      }
+    } catch (e) {}
+  }
 
   if (equityPoints.length === 0) {
     return (
