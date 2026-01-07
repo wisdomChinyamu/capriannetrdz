@@ -900,6 +900,21 @@ export async function getUserProfile(userId: string) {
   }
 }
 
+export async function updateUserProfile(userId: string, updates: any) {
+  try {
+    if (!isFirebaseInitialized()) {
+      console.warn("Firebase not properly initialized. Skipping updateUserProfile.");
+      return null;
+    }
+    const filtered = removeUndefinedFields({ ...updates, updatedAt: Timestamp.now() });
+    await updateDoc(doc(db, "users", userId), filtered);
+    return true;
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+}
+
 // ==================== ROUTINES ====================
 
 // Helper: return true if given date is a scheduled day for the routine

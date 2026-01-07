@@ -142,7 +142,7 @@ export default function DashboardScreen() {
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width >= 768;
-  const chartHeight = Math.round(Math.max(160, Math.min(300, width * 0.5)));
+  const chartHeight = Math.round(Math.max(220, Math.min(420, width * 0.6)));
 
   const handleScroll = (e: any) => {
     try {

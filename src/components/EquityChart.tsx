@@ -201,12 +201,21 @@ export default function EquityChart({
                 stroke={colors.highlight}
                 strokeWidth={1}
               />
-              <SvgText x={x + 10} y={y + 18} fontSize="13" fill="#fff" fontFamily={fontFamily}>
-                {delta === 0 ? series[selectedIndex].value.toFixed(2) : deltaStr}
-              </SvgText>
-              <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
-                {series[selectedIndex].date}
-              </SvgText>
+                <SvgText x={x + 10} y={y + 18} fontSize="13" fill="#fff" fontFamily={fontFamily}>
+                  {delta === 0 ? series[selectedIndex].value.toFixed(2) : deltaStr}
+                </SvgText>
+                <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
+                  {(() => {
+                    try {
+                      const d = new Date(series[selectedIndex].date);
+                      return isNaN(d.getTime())
+                        ? String(series[selectedIndex].date)
+                        : d.toLocaleString();
+                    } catch (e) {
+                      return String(series[selectedIndex].date);
+                    }
+                  })()}
+                </SvgText>
             </G>
           );
         })()}

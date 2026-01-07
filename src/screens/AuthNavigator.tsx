@@ -68,6 +68,24 @@ export default function AuthNavigator() {
               displayPreference: profile?.displayPreference,
               createdAt: profile?.createdAt || new Date(),
             } as any;
+            // Load persisted streak threshold if present
+            try {
+              if (profile?.streakResetThreshold !== undefined && profile?.streakResetThreshold !== null) {
+                const n = Number(profile.streakResetThreshold) || 0;
+                dispatch({ type: "SET_STREAK_RESET_THRESHOLD", payload: n });
+                try {
+                  // update module-level service value as well
+                  const mod = await import("../services/firebaseService");
+                  if (mod && typeof mod.setStreakResetThreshold === "function") {
+                    mod.setStreakResetThreshold(n);
+                  }
+                } catch (e) {
+                  console.warn("Couldn't set module streak threshold", e);
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
             dispatch({ type: "SET_USER", payload });
           } catch (e) {
             dispatch({

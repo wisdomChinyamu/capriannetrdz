@@ -71,7 +71,7 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
     const rawDate = (trade as any).tradeTime ?? (trade as any).createdAt;
     const pd = parseDate(rawDate) || new Date();
     equityPoints.push({
-      date: pd.toLocaleDateString(),
+      date: pd.toISOString(),
       value: equity,
     });
   });
@@ -147,6 +147,15 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
 
   const finalEquity = equityPoints[equityPoints.length - 1]?.value || 0;
   const isProfit = finalEquity >= 0;
+
+  // Compute max drawdown (peak-to-trough)
+  let peak = -Infinity;
+  let maxDrawdown = 0;
+  equityPoints.forEach((p) => {
+    if (p.value > peak) peak = p.value;
+    const dd = peak - p.value;
+    if (dd > maxDrawdown) maxDrawdown = dd;
+  });
 
   return (
     <View style={styles.container}>
@@ -319,7 +328,14 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
                   {delta === 0 ? (p.value >= 1000 || p.value <= -1000 ? p.value.toLocaleString() : p.value.toFixed(2)) : deltaStr}
                 </SvgText>
                 <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
-                  {p.date}
+                  {(() => {
+                    try {
+                      const d = new Date(p.date);
+                      return isNaN(d.getTime()) ? String(p.date) : d.toLocaleString();
+                    } catch (e) {
+                      return String(p.date);
+                    }
+                  })()}
                 </SvgText>
               </G>
             );
@@ -343,8 +359,8 @@ export default function EquityCurveChart({ trades }: EquityCurveChartProps) {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Drawdown</Text>
-          <Text style={[styles.statValue, { color: "#f44336" }]}>
-            {minValue.toFixed(2)}
+          <Text style={[styles.statValue, { color: "#f44336" }]}> 
+            {maxDrawdown ? `-${maxDrawdown.toFixed(2)}` : "0.00"}
           </Text>
         </View>
         <View style={styles.statDivider} />

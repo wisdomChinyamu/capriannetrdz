@@ -21,7 +21,7 @@ import {
   updateStrategy,
   deleteStrategy,
 } from "../services/firebaseService";
-import { setStreakResetThreshold } from "../services/firebaseService";
+import { setStreakResetThreshold, updateUserProfile } from "../services/firebaseService";
 import { logout } from "../services/firebaseService";
 import ConfirmModal from "../components/ConfirmModal";
 
@@ -51,14 +51,37 @@ export default function SettingsScreen() {
     dispatch({ type: "SET_UI_SCALE", payload: scale });
   };
 
+  const [streakInput, setStreakInput] = useState<string>(String(appContextState.streakResetThreshold || 1000));
+
   const handleStreakThresholdChange = (value: string) => {
-    const n = Number(value);
-    if (isNaN(n) || n < 0) return;
+    setStreakInput(value);
+  };
+
+  const saveStreakThreshold = async () => {
+    const n = Number(streakInput);
+    if (isNaN(n) || n < 0) {
+      Alert.alert("Invalid value", "Please enter a non-negative number for the streak threshold.");
+      return;
+    }
     dispatch({ type: "SET_STREAK_RESET_THRESHOLD", payload: n });
     try {
       setStreakResetThreshold(n);
     } catch (e) {
       console.warn("Failed to set streak threshold in service", e);
+    }
+
+    // Persist to user profile when possible
+    const uid = appContextState.user?.uid;
+    if (uid) {
+      try {
+        await updateUserProfile(uid, { streakResetThreshold: n });
+        Alert.alert("Saved", "Streak threshold saved to your profile.");
+      } catch (err) {
+        console.error("Failed to persist streak threshold", err);
+        Alert.alert("Saved locally", "Streak threshold updated locally but failed to persist.");
+      }
+    } else {
+      Alert.alert("Saved locally", "Streak threshold updated locally.");
     }
   };
 
@@ -70,6 +93,11 @@ export default function SettingsScreen() {
         .finally(() => setLoading(false));
     }
   }, [userId]);
+
+  // Keep input in sync when context changes (e.g., loaded from backend)
+  useEffect(() => {
+    setStreakInput(String(appContextState.streakResetThreshold || 1000));
+  }, [appContextState.streakResetThreshold]);
 
   const handleAddItem = (item: Omit<ChecklistItem, "id" | "createdAt">) => {
     dispatch({
@@ -313,16 +341,17 @@ export default function SettingsScreen() {
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>⚙️ Behavior</Text>
         <Text style={[styles.sectionDescription, { color: colors.subtext, marginBottom: 8 }]}>Streak reset policy</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <TextInput
             keyboardType="numeric"
-            value={String(appContextState.streakResetThreshold || 1000)}
+            value={streakInput}
             onChangeText={handleStreakThresholdChange}
-            style={[styles.input, { backgroundColor: colors.surface, color: colors.text, flex: 1 }]}
+            style={[styles.input, { backgroundColor: colors.surface, color: colors.text, flex: 1, minWidth: 120 }]}
+            placeholder="1000"
           />
-          <View style={[styles.createButton, { backgroundColor: colors.highlight }]}>
+          <TouchableOpacity onPress={saveStreakThreshold} style={[styles.createButton, { backgroundColor: colors.highlight }]}>
             <Text style={[styles.createButtonText, { color: colors.background }]}>Save</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
