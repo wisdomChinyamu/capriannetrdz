@@ -143,8 +143,11 @@ export default function DashboardScreen() {
   const { width } = Dimensions.get("window");
   const isLargeScreen = width >= 768;
   const chartHeight = Math.round(Math.max(260, Math.min(520, width * 0.7)));
-  // Use original calendar card height on large screens (previously used maxHeight: 640)
-  const calendarCardHeight = isLargeScreen ? 720 : undefined;
+  // measured calendar height (used to make calendar & weekly summary cards match)
+  const [calendarMeasuredHeight, setCalendarMeasuredHeight] = useState<number | undefined>(undefined);
+  const calendarCardHeight = isLargeScreen
+    ? calendarMeasuredHeight || 640
+    : undefined;
 
   const accountStartingBalance = React.useMemo(() => {
     if (!selectedAccountId || selectedAccountId === "all") {
@@ -577,7 +580,7 @@ export default function DashboardScreen() {
             {/* For large screens: Trading Calendar + Weekly Summary side-by-side */}
             {isLargeScreen && (
               <View style={{ flexDirection: "row", gap: 16 }}>
-                <View style={[styles.chartCard, { backgroundColor: colors.surface, flex: 2, height: calendarCardHeight }]}>
+                <View style={[styles.chartCard, { backgroundColor: colors.surface, flex: 2, height: calendarCardHeight }]}> 
                   <View style={styles.cardHeader}>
                     <Text
                       style={[
@@ -600,10 +603,14 @@ export default function DashboardScreen() {
                     trades={filteredTrades}
                     onDayPress={(date) => setSelectedDate(date)}
                     theme={mode}
+                    onMeasureHeight={(h) => {
+                      // only set when on large screens to avoid thrash
+                      if (isLargeScreen) setCalendarMeasuredHeight(h);
+                    }}
                   />
                 </View>
 
-                <View style={[styles.chartCard, { backgroundColor: colors.surface, flex: 1, height: calendarCardHeight }]}>
+                <View style={[styles.chartCard, { backgroundColor: colors.surface, flex: 1, height: calendarCardHeight }]}> 
                   <ScrollView
                     showsVerticalScrollIndicator={true}
                     contentContainerStyle={{ paddingVertical: 8 }}

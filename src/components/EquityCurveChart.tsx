@@ -32,11 +32,11 @@ export default function EquityCurveChart({
   );
   // Ensure Y-axis (chart) height is always 3/4 of X-axis width (chartWidth)
   // We compute internal padding-dependent chart width and force the overall
-  // SVG height so the inner chart area height == 0.65 * chartWidth.
+  // SVG height so the inner chart area height == 0.75 * chartWidth.
   const basePadding = 40;
   const paddingForCalc = basePadding;
   const chartWidthForCalc = internalWidth - paddingForCalc * 2;
-  const computedChartHeight = Math.max(120, Math.round(chartWidthForCalc * 0.65));
+  const computedChartHeight = Math.max(120, Math.round(chartWidthForCalc * 0.75));
   const height = typeof propHeight === "number" ? Math.max(propHeight, paddingForCalc * 2 + computedChartHeight) : paddingForCalc * 2 + computedChartHeight;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -113,7 +113,8 @@ export default function EquityCurveChart({
     );
   }
 
-  // Find min and max for scaling and add 8-12% headroom so flat lines are visible
+  // Keep raw values for stats but normalize series for plotting so the
+  // starting baseline point is displayed as 1 regardless of monetary value.
   const values = equityPoints.map((p) => p.value);
   const rawMin = Math.min(...values, 0);
   const rawMax = Math.max(...values, 0);
@@ -122,6 +123,19 @@ export default function EquityCurveChart({
   const minValue = rawMin - headroom;
   const maxValue = rawMax + headroom;
   const range = maxValue - minValue || 1;
+
+  // Normalization base: always use `startingBalance` when available so the
+  // starting baseline point plots at 1 on the Y axis. Fall back to the first
+  // equity point value or 1 to avoid division by zero.
+  const normalizationBase = startingBalance || equityPoints[0]?.value || 1;
+  const normalizedValues = equityPoints.map((p) => p.value / normalizationBase);
+  const plotRawMin = Math.min(...normalizedValues, 0);
+  const plotRawMax = Math.max(...normalizedValues, 0);
+  const plotRawRange = plotRawMax - plotRawMin || 1;
+  const plotHeadroom = Math.max(Math.abs(plotRawRange) * 0.12, 0.01);
+  const plotMinValue = plotRawMin - plotHeadroom;
+  const plotMaxValue = plotRawMax + plotHeadroom;
+  const plotRange = plotMaxValue - plotMinValue || 1;
 
   // Calculate points for polyline
   const padding = Math.min(basePadding, internalWidth * 0.08);
@@ -135,9 +149,10 @@ export default function EquityCurveChart({
       pointCount === 1
         ? padding + chartWidth / 2
         : padding + index * pointSpacing;
-    const y =
-      height - padding - ((point.value - minValue) / range) * chartHeight;
-    return { x, y, value: point.value, date: point.date };
+    // Use normalized value for plotting (first point will be 1)
+    const normalized = (point.value || 0) / normalizationBase;
+    const y = height - padding - ((normalized - plotMinValue) / plotRange) * chartHeight;
+    return { x, y, value: point.value, normalized, date: point.date };
   });
 
   const points = mappedPoints.map((p) => `${p.x},${p.y}`).join(" ");
@@ -326,6 +341,9 @@ export default function EquityCurveChart({
           {selectedIndex !== null && mappedPoints[selectedIndex] && (() => {
             const p = mappedPoints[selectedIndex];
             const prev = mappedPoints[selectedIndex - 1];
+            // Show monetary delta based on actual values; for the first point
+            // display the real starting balance in the tooltip instead of the
+            // normalized '1' value.
             const delta = prev ? p.value - prev.value : 0;
             const tipW = 160;
             const tipH = 48;
@@ -336,6 +354,7 @@ export default function EquityCurveChart({
             );
             const y = Math.max(padding, Math.min(p.y - tipH - 8, height - padding - tipH - margin));
             const deltaStr = `${delta >= 0 ? "+" : ""}${Math.abs(delta) >= 1000 || Math.abs(delta) <= -1000 ? delta.toLocaleString() : Math.abs(delta).toFixed(2)}`;
+            const displayMain = selectedIndex === 0 ? (startingBalance >= 1000 || startingBalance <= -1000 ? startingBalance.toLocaleString() : startingBalance.toFixed(2)) : (delta === 0 ? (p.value >= 1000 || p.value <= -1000 ? p.value.toLocaleString() : p.value.toFixed(2)) : deltaStr);
             return (
               <G key={`tooltip-${selectedIndex}`}>
                 <Rect
@@ -350,7 +369,7 @@ export default function EquityCurveChart({
                   strokeWidth={1}
                 />
                 <SvgText x={x + 10} y={y + 18} fontSize="13" fill="#fff" fontFamily={fontFamily}>
-                  {delta === 0 ? (p.value >= 1000 || p.value <= -1000 ? p.value.toLocaleString() : p.value.toFixed(2)) : deltaStr}
+                  {displayMain}
                 </SvgText>
                 <SvgText x={x + 10} y={y + 34} fontSize="11" fill="#9aa" fontFamily={fontFamily}>
                   {(() => {
@@ -369,10 +388,10 @@ export default function EquityCurveChart({
       </View>
 
       {/* Stats Footer */}
-      <View style={styles.statsFooter}>
+        <View style={styles.statsFooter}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Trades</Text>
-          <Text style={styles.statValue}>{equityPoints.length}</Text>
+          <Text style={styles.statValue}>{Math.max(0, equityPoints.length - 1)}</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>

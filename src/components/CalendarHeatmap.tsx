@@ -17,12 +17,14 @@ interface CalendarHeatmapProps {
   trades: Trade[];
   onDayPress?: (date: Date) => void;
   theme?: "dark" | "light";
+  onMeasureHeight?: (h: number) => void;
 }
 
 export default function CalendarHeatmap({
   trades,
   onDayPress,
   theme = "dark",
+  onMeasureHeight,
 }: CalendarHeatmapProps) {
   const { colors } = useTheme();
   const toDate = (value: any): Date | null => {
@@ -268,7 +270,12 @@ export default function CalendarHeatmap({
   return (
     <View
       style={[styles.container, { position: "relative", paddingTop: 44 }]}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        setContainerWidth(e.nativeEvent.layout.width);
+        try {
+          onMeasureHeight?.(e.nativeEvent.layout.height);
+        } catch (e) {}
+      }}
     >
       {/* Header with Navigation */}
       <View style={styles.header}>
