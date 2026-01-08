@@ -12,6 +12,7 @@ import Svg, {
   Rect,
 } from "react-native-svg";
 import { useTheme } from "./ThemeProvider";
+import { formatCompactNumber } from "../utils/chartingUtils";
 
 type Point = { x: number; y: number };
 
@@ -27,6 +28,8 @@ export default function EquityChart({
   leftPadding?: number;
 }) {
   const { colors, fontFamily } = useTheme();
+  const { width } = Dimensions.get("window");
+  const isSmallScreen = width < 768;
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(
     null
   );
@@ -250,12 +253,16 @@ export default function EquityChart({
       </Svg>
 
       {/* Stats Footer */}
-      <View style={styles.chartFooter}>
+        <View style={styles.chartFooter}>
         <View style={styles.statItem}>
           <Text style={[styles.statLabel, { color: colors.subtext }]}>
             Starting
           </Text>
-          <Text style={[styles.statValue, { color: colors.text }]}>{startingBalance.toFixed(2)}</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}> {
+            isSmallScreen && Math.abs(startingBalance) > 999.99
+              ? formatCompactNumber(startingBalance)
+              : startingBalance.toFixed(2)
+          }</Text>
         </View>
         <View
           style={[styles.statDivider, { backgroundColor: colors.neutral }]}
@@ -275,7 +282,9 @@ export default function EquityChart({
               },
             ]}
           >
-            {series[series.length - 1].value.toFixed(2)}
+            {isSmallScreen && Math.abs(series[series.length - 1].value) > 999.99
+              ? formatCompactNumber(series[series.length - 1].value)
+              : series[series.length - 1].value.toFixed(2)}
           </Text>
         </View>
         <View
@@ -297,7 +306,9 @@ export default function EquityChart({
             ]}
           >
             {series[series.length - 1].value >= 0 ? "+" : ""}
-            {series[series.length - 1].value.toFixed(2)}
+            {isSmallScreen && Math.abs(series[series.length - 1].value) > 999.99
+              ? formatCompactNumber(series[series.length - 1].value)
+              : series[series.length - 1].value.toFixed(2)}
           </Text>
         </View>
       </View>

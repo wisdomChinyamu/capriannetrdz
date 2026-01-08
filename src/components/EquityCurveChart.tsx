@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Dimensions, Platform } from "react-native";
 import { useTheme } from "./ThemeProvider";
+import { formatCompactNumber } from "../utils/chartingUtils";
 import Svg, {
   Polyline,
   Circle,
@@ -186,6 +187,8 @@ export default function EquityCurveChart({
   }
 
   const { colors, fontFamily } = useTheme();
+  const { width } = Dimensions.get("window");
+  const isSmallScreen = width < 768;
 
   const finalEquity = equityPoints[equityPoints.length - 1]?.value || 0;
   const isProfit = finalEquity >= 0;
@@ -401,14 +404,16 @@ export default function EquityCurveChart({
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Peak</Text>
           <Text style={[styles.statValue, { color: "#4caf50" }]}>
-            {rawPeak.toFixed(2)}
+            {isSmallScreen && Math.abs(rawPeak) > 999.99 ? formatCompactNumber(rawPeak) : rawPeak.toFixed(2)}
           </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Drawdown</Text>
           <Text style={[styles.statValue, { color: "#f44336" }]}> 
-            {maxDrawdown ? `-${maxDrawdown.toFixed(2)} (${drawdownPercent.toFixed(1)}%)` : "0.00"}
+            {maxDrawdown
+              ? `-${isSmallScreen && Math.abs(maxDrawdown) > 999.99 ? formatCompactNumber(maxDrawdown) : maxDrawdown.toFixed(2)} (${drawdownPercent.toFixed(1)}%)`
+              : "0.00"}
           </Text>
         </View>
         <View style={styles.statDivider} />
@@ -420,7 +425,7 @@ export default function EquityCurveChart({
               { color: isProfit ? "#4caf50" : "#f44336" },
             ]}
           >
-            {finalEquity.toFixed(2)}
+            {isSmallScreen && Math.abs(finalEquity) > 999.99 ? formatCompactNumber(finalEquity) : finalEquity.toFixed(2)}
           </Text>
         </View>
       </View>

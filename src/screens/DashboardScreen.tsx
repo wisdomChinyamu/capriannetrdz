@@ -32,6 +32,7 @@ import {
   calculateConfluenceScore,
   assignGrade,
 } from "../utils/calculations";
+import { formatCompactNumber } from "../utils/chartingUtils";
 import { Trade, TradeDirection, TradeSession, Strategy } from "../types";
 import {
   getUserStrategies,
@@ -142,6 +143,7 @@ export default function DashboardScreen() {
 
   const { width } = Dimensions.get("window");
   const isLargeScreen = width >= 768;
+  const isSmallScreen = !isLargeScreen;
   const chartHeight = Math.round(Math.max(260, Math.min(520, width * 0.7)));
   // measured calendar height (used to make calendar & weekly summary cards match)
   const [calendarMeasuredHeight, setCalendarMeasuredHeight] = useState<number | undefined>(undefined);
@@ -193,7 +195,7 @@ export default function DashboardScreen() {
               <Text
                 style={[
                   styles.title,
-                  { color: colors.text, fontSize: 32 * scaleMultiplier },
+                  { color: colors.text, fontSize: 32 * scaleMultiplier * (isSmallScreen ? 0.7 : 1) },
                 ]}
               >
                 {(() => {
@@ -211,12 +213,12 @@ export default function DashboardScreen() {
               <View style={styles.accentLine} />
             </View>
           </View>
-          <Text
-            style={[
-              styles.subtitle,
-              { color: colors.subtext, fontSize: 15 * scaleMultiplier },
-            ]}
-          >
+            <Text
+              style={[
+                styles.subtitle,
+                { color: colors.subtext, fontSize: 15 * scaleMultiplier },
+              ]}
+            >
             Trading Performance Dashboard
           </Text>
         </View>
@@ -299,7 +301,9 @@ export default function DashboardScreen() {
                 },
               ]}
             >
-              ${pnlStats.totalPnL}
+              {isSmallScreen && Math.abs(pnlStats.totalPnL) > 999.99
+                ? `$${formatCompactNumber(pnlStats.totalPnL)}`
+                : `$${pnlStats.totalPnL.toFixed(2)}`}
             </Text>
             <Text style={[styles.statSubtext, { color: colors.subtext }]}>
               Avg: ${pnlStats.avgPnL}

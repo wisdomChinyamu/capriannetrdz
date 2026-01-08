@@ -129,3 +129,37 @@ export function calculatePnL(trades: any[]): {
     losingTrades,
   };
 }
+
+/**
+ * Format numbers compactly using suffixes: k (thousand), M (million), B (billion), T (trillion).
+ * On small screens we display compact forms for absolute values > 999.99.
+ */
+export function formatCompactNumber(n: number): string {
+  const num = Number(n) || 0;
+  const abs = Math.abs(num);
+  const sign = num < 0 ? "-" : "";
+
+  if (abs < 1000) {
+    return sign + abs.toFixed(2);
+  }
+
+  const units: { value: number; symbol: string }[] = [
+    { value: 1e12, symbol: "T" },
+    { value: 1e9, symbol: "B" },
+    { value: 1e6, symbol: "M" },
+    { value: 1e3, symbol: "k" },
+  ];
+
+  for (const u of units) {
+    if (abs >= u.value) {
+      const scaled = abs / u.value;
+      let decimals = 2;
+      if (scaled >= 100) decimals = 0;
+      else if (scaled >= 10) decimals = 1;
+      const formatted = scaled.toFixed(decimals).replace(/\.00$|(?<=\.[0-9])0+$/g, "");
+      return sign + formatted + u.symbol;
+    }
+  }
+
+  return sign + abs.toFixed(2);
+}
