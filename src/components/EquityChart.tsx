@@ -34,7 +34,13 @@ export default function EquityChart({
   const [internalWidth, setInternalWidth] = React.useState<number>(800);
   const padding = { top: 24, right: 48, bottom: 36, left: leftPadding ?? 48 };
   const chartWidth = internalWidth - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  // Enforce y-axis height == 0.5 * x-axis width
+  const computedChartHeight = Math.max(120, Math.round(chartWidth * 0.5));
+  const finalHeight = padding.top + padding.bottom + computedChartHeight;
+  const chartHeight = finalHeight - padding.top - padding.bottom;
+
+  // Normalize by starting balance (or first series value) so the first plotted
+  // point maps to 1 regardless of monetary magnitude.
 
   const min = Math.min(0, ...series.map((s) => s.value));
   const max = Math.max(1, ...series.map((s) => s.value));
@@ -91,8 +97,8 @@ export default function EquityChart({
     >
       <Svg
         width={"100%"}
-        height={height}
-        viewBox={`0 0 ${internalWidth} ${height}`}
+        height={finalHeight}
+        viewBox={`0 0 ${internalWidth} ${finalHeight}`}
         preserveAspectRatio="xMidYMid meet"
       >
         <Defs>

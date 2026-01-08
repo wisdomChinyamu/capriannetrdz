@@ -30,14 +30,15 @@ export default function EquityCurveChart({
   const [internalWidth, setInternalWidth] = useState(
     Math.min(1200, Math.max(320, screenWidth - 48))
   );
-  // Ensure Y-axis (chart) height is always 3/4 of X-axis width (chartWidth)
+  // Ensure Y-axis (chart) height is always 1/2 of X-axis width (chartWidth)
   // We compute internal padding-dependent chart width and force the overall
-  // SVG height so the inner chart area height == 0.75 * chartWidth.
+  // SVG height so the inner chart area height == 0.5 * chartWidth.
   const basePadding = 40;
   const paddingForCalc = basePadding;
   const chartWidthForCalc = internalWidth - paddingForCalc * 2;
-  const computedChartHeight = Math.max(120, Math.round(chartWidthForCalc * 0.75));
-  const height = typeof propHeight === "number" ? Math.max(propHeight, paddingForCalc * 2 + computedChartHeight) : paddingForCalc * 2 + computedChartHeight;
+  const computedChartHeight = Math.max(120, Math.round(chartWidthForCalc * 0.5));
+  // Force the SVG height such that inner chart area height == 0.5 * chartWidth
+  const height = paddingForCalc * 2 + computedChartHeight;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   // Helper to parse Firestore Timestamp / number / string / Date
@@ -88,13 +89,19 @@ export default function EquityCurveChart({
     });
   });
 
-  // Add a starting baseline point (slightly before the first trade) so chart shows starting balance
+  // Ensure a starting baseline point exists (slightly before the first trade)
+  // and always use it as the normalization base so the first plotted point == 1.
   if (equityPoints.length > 0) {
     try {
       const firstDate = new Date(equityPoints[0].date);
       const baselineTime = new Date(Math.max(0, firstDate.getTime() - 1));
-      if (Math.abs(equityPoints[0].value - startingBalance) > 0.0001) {
-        equityPoints.unshift({ date: new Date(baselineTime).toISOString(), value: startingBalance });
+      const baseValue = startingBalance || equityPoints[0].value || 1;
+      if (Math.abs(equityPoints[0].value - baseValue) > 0.0001) {
+        equityPoints.unshift({ date: new Date(baselineTime).toISOString(), value: baseValue });
+      } else {
+        // If the first point already equals baseValue, ensure it's the earliest
+        // by nudging its date slightly earlier.
+        equityPoints[0].date = new Date(Math.max(0, new Date(equityPoints[0].date).getTime() - 1)).toISOString();
       }
     } catch (e) {}
   }
@@ -113,54 +120,51 @@ export default function EquityCurveChart({
     );
   }
 
-  // Keep raw values for stats but normalize series for plotting so the
-  // starting baseline point is displayed as 1 regardless of monetary value.
-  const values = equityPoints.map((p) => p.value);
-  const rawMin = Math.min(...values, 0);
-  const rawMax = Math.max(...values, 0);
-  const rawRange = rawMax - rawMin || 1;
-  const headroom = Math.max(Math.abs(rawRange) * 0.12, 1);
-  const minValue = rawMin - headroom;
-  const maxValue = rawMax + headroom;
-  const range = maxValue - minValue || 1;
+  // Keep raw values for stats (rawValues) but prepare a plotting series
+  // that is transformed so the first point is the origin (x=0, y=0).
+  const rawValues = equityPoints.map((p) => p.value);
+  const rawMin = Math.min(...rawValues, 0);
+  const rawMax = Math.max(...rawValues, 0);
 
-  // Normalization base: always use `startingBalance` when available so the
-  // starting baseline point plots at 1 on the Y axis. Fall back to the first
-  // equity point value or 1 to avoid division by zero.
-  const normalizationBase = startingBalance || equityPoints[0]?.value || 1;
-  const normalizedValues = equityPoints.map((p) => p.value / normalizationBase);
-  const plotRawMin = Math.min(...normalizedValues, 0);
-  const plotRawMax = Math.max(...normalizedValues, 0);
-  const plotRawRange = plotRawMax - plotRawMin || 1;
-  const plotHeadroom = Math.max(Math.abs(plotRawRange) * 0.12, 0.01);
-  const plotMinValue = plotRawMin - plotHeadroom;
-  const plotMaxValue = plotRawMax + plotHeadroom;
+  // Baseline: first point's raw value (we ensured it exists above)
+  const baselineValue = equityPoints[0]?.value || startingBalance || 0;
+
+  // Transformed points: subtract baseline so first value === 0
+  const transformedPoints = equityPoints.map((p) => ({
+    ...p,
+    value: (p.value || 0) - baselineValue,
+  }));
+
+  // Determine plotting bounds from transformed values
+  const tValues = transformedPoints.map((p) => p.value);
+  const tMin = Math.min(...tValues, 0);
+  const tMax = Math.max(...tValues, 0);
+  const tRange = tMax - tMin || 1;
+  const tHeadroom = Math.max(Math.abs(tRange) * 0.12, 0.01);
+  const plotMinValue = tMin - tHeadroom;
+  const plotMaxValue = tMax + tHeadroom;
   const plotRange = plotMaxValue - plotMinValue || 1;
 
   // Calculate points for polyline
   const padding = Math.min(basePadding, internalWidth * 0.08);
   const chartWidth = internalWidth - padding * 2;
   const chartHeight = height - padding * 2;
-  const pointCount = Math.max(1, equityPoints.length);
+  const pointCount = Math.max(1, transformedPoints.length);
   const pointSpacing = pointCount === 1 ? 0 : chartWidth / (pointCount - 1);
 
-  const mappedPoints = equityPoints.map((point, index) => {
+  const mappedPoints = transformedPoints.map((point, index) => {
     const x =
       pointCount === 1
         ? padding + chartWidth / 2
         : padding + index * pointSpacing;
-    // Use normalized value for plotting (first point will be 1)
-    const normalized = (point.value || 0) / normalizationBase;
-    const y = height - padding - ((normalized - plotMinValue) / plotRange) * chartHeight;
-    return { x, y, value: point.value, normalized, date: point.date };
+    const y = height - padding - ((point.value - plotMinValue) / plotRange) * chartHeight;
+    return { x, y, value: point.value, date: point.date, rawValue: (equityPoints[index]?.value ?? baselineValue) };
   });
 
   const points = mappedPoints.map((p) => `${p.x},${p.y}`).join(" ");
 
   // Calculate area polygon points
-  const areaPolygon = `${points} ${internalWidth - padding},${
-    height - padding
-  } ${padding},${height - padding}`;
+  const areaPolygon = `${points} ${internalWidth - padding},${height - padding} ${padding},${height - padding}`;
 
   // Grid lines (no numeric labels)
   const gridLines = [];
@@ -194,7 +198,7 @@ export default function EquityCurveChart({
     const dd = peak - p.value;
     if (dd > maxDrawdown) maxDrawdown = dd;
   });
-  const rawPeak = Math.max(...values);
+  const rawPeak = Math.max(...rawValues, 0);
   const drawdownPercent = rawPeak > 0 ? (maxDrawdown / rawPeak) * 100 : 0;
 
   return (
@@ -267,13 +271,13 @@ export default function EquityCurveChart({
           {/* Grid lines */}
           {gridLines}
 
-          {/* Zero line */}
-          {minValue < 0 && (
+          {/* Zero line (in normalized plot space) */}
+          {plotMinValue < 0 && (
             <Line
               x1={padding}
-              y1={height - padding - ((0 - minValue) / range) * chartHeight}
+              y1={height - padding - ((0 - plotMinValue) / plotRange) * chartHeight}
               x2={internalWidth - padding}
-              y2={height - padding - ((0 - minValue) / range) * chartHeight}
+              y2={height - padding - ((0 - plotMinValue) / plotRange) * chartHeight}
               stroke="#f44336"
               strokeWidth="1"
               strokeDasharray="4,4"

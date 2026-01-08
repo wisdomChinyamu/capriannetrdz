@@ -146,7 +146,7 @@ export default function DashboardScreen() {
   // measured calendar height (used to make calendar & weekly summary cards match)
   const [calendarMeasuredHeight, setCalendarMeasuredHeight] = useState<number | undefined>(undefined);
   const calendarCardHeight = isLargeScreen
-    ? calendarMeasuredHeight || 640
+    ? (calendarMeasuredHeight ? calendarMeasuredHeight + 110 : 750)
     : undefined;
 
   const accountStartingBalance = React.useMemo(() => {
@@ -612,7 +612,7 @@ export default function DashboardScreen() {
 
                 <View style={[styles.chartCard, { backgroundColor: colors.surface, flex: 1, height: calendarCardHeight }]}> 
                   <ScrollView
-                    showsVerticalScrollIndicator={true}
+                    showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingVertical: 8 }}
                   >
                     <WeeklySummaryPanel trades={filteredTrades} layout="vertical" />
@@ -1210,6 +1210,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(0, 212, 212, 0.1)",
+    overflow: "hidden",
   },
   cardHeader: {
     marginBottom: 16,
