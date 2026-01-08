@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Dimensions, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Dimensions, ScrollView, Platform } from "react-native";
 import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
 import { Trade } from "../types";
 import { getPerformanceBy } from "../utils/calculations";
@@ -13,6 +13,8 @@ export default function PerformanceByPairChart({
   trades,
 }: PerformanceByPairChartProps) {
   const { colors, fontFamily } = useTheme();
+  const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+  const [tappedIndex, setTappedIndex] = React.useState<number | null>(null);
   const width = Dimensions.get("window").width - 32;
   const height = 280;
   const padding = { top: 30, right: 20, bottom: 60, left: 50 };
@@ -50,8 +52,13 @@ export default function PerformanceByPairChart({
 
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const barWidth = Math.min(chartWidth / pairs.length - 16, 60);
-  const spacing = (chartWidth - barWidth * pairs.length) / (pairs.length + 1);
+  // Ensure bars and labels never touch - enforce minimum spacing
+  const minSpacing = 24; // px
+  const maxBarWidth = 60;
+  // Compute a bar width that leaves at least minSpacing between bars
+  const tentativeBarWidth = (chartWidth - minSpacing * (pairs.length + 1)) / pairs.length;
+  const barWidth = Math.max(24, Math.min(maxBarWidth, tentativeBarWidth));
+  const spacing = Math.max(minSpacing, (chartWidth - barWidth * pairs.length) / (pairs.length + 1));
   const maxValue = Math.max(...Object.values(performance), 100);
 
   // Helper to get color based on win rate
@@ -80,6 +87,13 @@ export default function PerformanceByPairChart({
       color,
     };
   });
+
+  // Clear tapped tooltip after 3s
+  React.useEffect(() => {
+    if (tappedIndex === null) return;
+    const t = setTimeout(() => setTappedIndex(null), 3000);
+    return () => clearTimeout(t);
+  }, [tappedIndex]);
 
   // Grid lines (5 horizontal lines)
   const gridLines = Array.from({ length: 5 }, (_, i) => {
@@ -183,7 +197,7 @@ export default function PerformanceByPairChart({
                 {bar.percentage.toFixed(0)}%
               </SvgText>
 
-              {/* Pair label below bar */}
+              {/* Pair label below bar - short on small screens, full on hover/tap */}
               <SvgText
                 x={bar.x + barWidth / 2}
                 y={padding.top + chartHeight + 20}
@@ -192,13 +206,27 @@ export default function PerformanceByPairChart({
                 fontWeight="700"
                 textAnchor="middle"
                 fontFamily={fontFamily}
+                onPress={(() => {
+                  // Native tap support
+                  return () => {
+                    setTappedIndex(i);
+                  };
+                })()}
+                {...(Platform.OS === "web"
+                  ? ({
+                      onMouseEnter: () => setHoveredIndex(i),
+                      onMouseLeave: () => setHoveredIndex((h) => (h === i ? null : h)),
+                    } as any)
+                  : ({} as any))}
               >
                 {(() => {
                   try {
                     const raw = String(bar.pair || "").replace(/\//g, "");
+                    const showFull = hoveredIndex === i || tappedIndex === i;
+                    if (showFull) return bar.pair;
                     if (isSmallScreen) {
-                      if (raw.length >= 4) return `${raw.charAt(0)}${raw.charAt(3)}`;
-                      return raw.slice(0, 2);
+                      if (raw.length >= 4) return `${raw.charAt(0)}.${raw.charAt(3)}.`;
+                      return `${raw.slice(0, 2)}.`;
                     }
                     return bar.pair;
                   } catch (e) {
