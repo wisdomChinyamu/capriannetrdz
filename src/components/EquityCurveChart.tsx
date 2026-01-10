@@ -62,10 +62,17 @@ export default function EquityCurveChart({
   };
 
   // Calculate equity curve (account balance over time)
+  // Sort trades by tradeTime (when trade was taken) to ensure chronological ordering
+  const sortedTrades = [...trades].sort((a, b) => {
+    const dateA = parseDate((a as any).tradeTime ?? (a as any).createdAt) || new Date();
+    const dateB = parseDate((b as any).tradeTime ?? (b as any).createdAt) || new Date();
+    return dateA.getTime() - dateB.getTime();
+  });
+
   let equity = startingBalance;
   const equityPoints: { date: string; value: number }[] = [];
 
-  trades.forEach((trade) => {
+  sortedTrades.forEach((trade) => {
     if (trade.riskAmount) {
       // Use actual monetary values if riskAmount is available
       if (trade.result === "Win") {

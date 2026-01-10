@@ -36,6 +36,25 @@ export default function JournalScreen({ navigation }: any) {
   const [accountModalVisible, setAccountModalVisible] =
     useState<boolean>(false);
 
+  // Helper to parse Firestore Timestamp / number / string / Date
+  const parseDate = (value: any): Date | null => {
+    if (!value && value !== 0) return null;
+    if (typeof value?.toDate === "function") {
+      try {
+        const d = value.toDate();
+        return isNaN(d.getTime()) ? null : d;
+      } catch {
+        return null;
+      }
+    }
+    if (typeof value === "number") {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const filteredTrades = (state.trades || [])
     .filter((trade) => {
       if (
@@ -54,9 +73,10 @@ export default function JournalScreen({ navigation }: any) {
     })
     .sort((a, b) => {
       if (sortBy === "date") {
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // Use tradeTime (when trade was taken) instead of createdAt (when entered into database)
+        const dateA = parseDate((a as any).tradeTime ?? (a as any).createdAt) || new Date();
+        const dateB = parseDate((b as any).tradeTime ?? (b as any).createdAt) || new Date();
+        return dateB.getTime() - dateA.getTime();
       } else if (sortBy === "grade") {
         const gradeOrder = { "A+": 5, A: 4, B: 3, C: 2, D: 1 };
         return gradeOrder[b.grade] - gradeOrder[a.grade];
