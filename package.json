@@ -1,5 +1,6 @@
 {
-  "name": "my-app",
+  "homepage": "http://wisdomChinyamu.github.io/capriannetrdz",
+  "name": "capriannetrdz",
   "license": "0BSD",
   "version": "1.0.0",
   "main": "index.ts",
@@ -8,7 +9,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "web:dev": "expo start --web --dev"
+    "web:dev": "expo start --web --dev",
+    "build-web": "expo export --platform web && touch dist/.nojekyll",
+    "predeploy": "npm run build-web",
+    "deploy": "gh-pages -d dist",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.3.0",
@@ -48,6 +53,7 @@
     "@types/node": "^25.0.3",
     "@types/react": "~18.2.79",
     "@types/react-native": "^0.73.0",
+    "gh-pages": "^6.3.0",
     "nativewind": "^4.1.2",
     "tailwindcss": "^3.4.1",
     "typescript": "~5.3.3"
