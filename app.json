@@ -26,7 +26,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "output": "static"
-    }
+      "output": "default"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "730ae14d-7187-4d44-95e2-4816a105e79f"
+      }
+    },
+    "owner": "caprianne-trdz"
   }
 }
