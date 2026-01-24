@@ -22,7 +22,11 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
+<<<<<<< HEAD
       run: npm install --legacy-peer-deps
+=======
+      run: npm install --force
+>>>>>>> a32f29f08150c6fe036082039722d9c3303f2585
       
     - name: Build for production
       run: npm run build-web
